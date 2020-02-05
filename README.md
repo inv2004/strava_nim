@@ -2,6 +2,7 @@
 
 The draft version is able to:
 - [x] Request google email and spreadsheet access
+- [ ] Refresh token after expiration
 - [x] Request strava activities access
 - [x] Find current date plan from spreadsheet
 - [x] Download watts stream from strava

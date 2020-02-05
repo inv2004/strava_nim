@@ -393,7 +393,7 @@ proc main2() {.async.} =
     # "1x15 (240) + 7x3 (310)".normalize_plan().process(t["time"], t["watts"])
     "7x3 (240)".normalize_plan().process(t["time"], t["watts"])
 
-proc main3() {.async.} =
+proc test() {.async.} =
     let pattern = @[(1,2.0), (3,3.0)]
 
     let t = @[0,   1,  2,  3,  4, 5].map(x => x.float)
@@ -407,8 +407,6 @@ proc main3() {.async.} =
 when isMainModule:
     try:
         waitFor server.serve(Port(8080), handler)
-        # waitFor main2()
-        # list_db()
     except:
         echo "Exception: " & getCurrentExceptionMsg()
 
