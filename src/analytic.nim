@@ -2,6 +2,8 @@ import times
 import strformat
 import sequtils
 import algorithm
+import re
+import strutils
 
 type
     Interval* = tuple
@@ -25,6 +27,12 @@ proc `$`(a: Interval): string =
 proc `$`(d: Duration): string =
     let d = d.toParts()
     fmt"{d[Hours]}:{d[Minutes]:02}:{d[Seconds]:02}"
+
+func normalize_plan*(plan: string): seq[Pattern] =
+    for x in plan.findAll(re"\d+x\d+"):
+        let vals = x.split('s')
+        let pattern: Pattern = (vals[0].parseInt, (60 * vals[1].parseInt).float)
+        result.add(pattern)    
 
 proc process_best*(pattern: seq[Pattern], time: seq[float], watts: seq[float]): seq[Interval] =
     for (repeat, ws) in pattern:
@@ -96,3 +104,12 @@ proc process_select*(pattern: seq[Pattern], best: seq[Interval]): seq[Interval] 
 
     result.sort(cmp3, Ascending)
 
+proc process*(pattern: seq[Pattern], time: seq[float], watts: seq[float]) =
+    echo "processing ", pattern
+
+    let best = pattern.process_best(time, watts)
+    let found = pattern.process_select(best) 
+
+    for x in found:
+        echo x
+    
