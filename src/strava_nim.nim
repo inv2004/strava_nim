@@ -34,7 +34,9 @@ proc test() {.async.} =
     let t = @[0,   1,  2,  3,  4, 5].map(x => x.float)
     let w = @[10, 20, 30, 20, 10, 5].map(x => x.float)
     pattern.process(t, w)
-    echo ""
+
+    echo ()
+    
     let t2 = @[0,   1,  3,  4, 5].map(x => x.float)
     let w2 = @[10, 20, 20, 10, 5].map(x => x.float)
     pattern.process(t2, w2)
