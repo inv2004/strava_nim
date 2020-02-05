@@ -2,6 +2,7 @@
 
 The draft version is able to:
 - [x] Request google email and spreadsheet access
+- [x] store tokens locally
 - [ ] Refresh token after expiration
 - [x] Request strava activities access
 - [x] Find current date plan from spreadsheet
