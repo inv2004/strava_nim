@@ -7,15 +7,14 @@ discard db.load()
 proc store*(profile: (string, string), accessToken: string) = # TODO: refactoring
     let id = profile[0]
     let email = profile[1]
-
     let entry = db.queryOne equal("id", id)
 
-    if isNil entry:
-        discard db.append(%* {"id": id, "email": email, "access_token": accessToken})
-    else:
+    if not isNil entry:
         let db_id = entry["_id"].getStr
-        db[db_id]["email"] = newJString(email)
-        db[db_id]["access_token"] = newJString(accessToken)
+        db.delete db_id
+
+    discard db.append(%* {"id": id, "email": email, "access_token": accessToken})
+    db.flush()
 
 proc upd_store*(id: string, key: string, value: string) = # TODO: refactoring
     let entry = db.queryOne equal("id", id)
