@@ -34,7 +34,7 @@ proc normalize_plan*(plan: string): seq[Pattern] =
         let pattern: Pattern = (vals[0].parseInt, (60 * vals[1].parseInt).float)
         result.add(pattern)    
 
-proc process_best*(pattern: seq[Pattern], time: seq[float], watts: seq[float]): seq[Interval] =
+proc generate_best*(pattern: seq[Pattern], time: seq[float], watts: seq[float]): seq[Interval] =
     for (repeat, ws) in pattern:
         var acc = 0.0
         var i = 0
@@ -57,7 +57,7 @@ proc process_best*(pattern: seq[Pattern], time: seq[float], watts: seq[float]): 
 
     result.sort(cmp2, Ascending)
 
-proc process_select*(pattern: seq[Pattern], best: seq[Interval]): seq[Interval] =
+proc select_top*(pattern: seq[Pattern], best: seq[Interval]): seq[Interval] =
     var best = best
     func overlap(a,b: Interval): bool =
         if a.start <= b.start and a.stop > b.start:
@@ -87,11 +87,7 @@ proc process_select*(pattern: seq[Pattern], best: seq[Interval]): seq[Interval] 
         while best.len > 0 and repeat > 0:
             let x = best.pop()
             if x.duration >= ws:
-                block checkBlock:
-                    for y in result:
-                        if overlap(x, y):
-                            # echo "overlap ", x, y
-                            break checkBlock
+                if result.allIt(not overlap(x, it)):
                     result.add(x)
                     repeat -= 1
 
@@ -107,8 +103,8 @@ proc process_select*(pattern: seq[Pattern], best: seq[Interval]): seq[Interval] 
 proc process*(pattern: seq[Pattern], time: seq[float], watts: seq[float]) =
     echo "processing ", pattern
 
-    let best = pattern.process_best(time, watts)
-    let found = pattern.process_select(best) 
+    let best = pattern.generate_best(time, watts)
+    let found = pattern.select_top(best) 
 
     for x in found:
         echo x
