@@ -32,10 +32,6 @@ const
     stravaAccessTokenUrl = "https://www.strava.com/oauth/token"
     stravaApi = "https://www.strava.com/api/v3"
 
-var accessToken = ""
-var stravaAccessToken = ""
-var sheetId = ""
-
 let client = newAsyncHttpClient()
 
 proc email_test(accessToken: string): Future[(string, string)] {.async.} =
@@ -71,7 +67,7 @@ proc http_handler*(req: Request) {.async, gcsafe.} =
 
     if req.url.path == "/":
         let msg = """
-<HTML>Click here to start start authorisation <a href="/gauth">Google Auth</a></HTML>
+<HTML>Click here to start authorisation <a href="/gauth">Google Auth</a></HTML>
 """
         await req.respond(Http200, msg, headers)
     elif req.url.path == "/gauth":
@@ -116,30 +112,33 @@ proc http_handler*(req: Request) {.async, gcsafe.} =
         let j = parseJson(body)
         echo j
         if j.contains("access_token"):
-            accessToken = j["access_token"].getStr()
+            let accessToken = j["access_token"].getStr()
 
             let profile = await email_test(accessToken)
+            let uid = profile[0]
+            # let email = profile[1]
 
             store(profile, accessToken)
-            upd_store(profile[0], j["refresh_token"].getStr)
+            upd_store(uid, "refresh_token", j["refresh_token"].getStr)
+            upd_store(uid, "sheet_id", params["sheet_id"])
 
-            sheetId = params["sheet_id"]
             let res2 = await sheet_test(params["sheet_id"], accessToken)
             let msg = """
 <HTML>Ok:<br/>""" & res2 & """
 <p/>
-<a href="/sauth">Strava Auth</a>
+<a href="/sauth?uid=""" & uid & """">Strava Auth</a>
 </HTML>
 """
             await req.respond(Http200, msg, headers)
         else:
             await req.respond(Http200, "<HTML>Error. <a href=\"/\">Restart</a></HTML>", headers)
     elif req.url.path == "/sauth":
+        let params = req.url.query.parseQuery()
         let state = generateState()
         let grantUrl = getAuthorizationCodeGrantUrl(
             stravaAuthorizeUrl,
             stravaClientId,
-            redirectUri & "/scode",
+            redirectUri & "/scode?uid=" & params["uid"],
             state,
             @["activity:read_all"],
             accessType = "offline"
@@ -148,37 +147,42 @@ proc http_handler*(req: Request) {.async, gcsafe.} =
         await req.respond(Http301, "", headers)
     elif req.url.path == "/scode":
         let params = req.url.query.parseQuery()
+        let uid = params["uid"]
         # echo $params
         let resp = await client.getAuthorizationCodeAccessToken(
             stravaAccessTokenUrl,
             params["code"],
             stravaClientId,
             stravaClientSecret,
-            redirectUri & "/gcode",
+            redirectUri & "/scode?uid=" & params["uid"],
             useBasicAuth = false
         )
         let body =  await resp.body()
         let j = parseJson(body)
         # echo j.pretty
         if j.contains("access_token"):
-            stravaAccessToken = j["access_token"].getStr()
+            upd_store(uid, "strava_access_token", j["access_token"].getStr)
+
             let athlete = j["athlete"]
             let msg = """
 <HTML>
 Ok<br/>Hello """ & athlete["firstname"].getStr() & " " & athlete["lastname"].getStr() & """
 <p/>
-<a href="/process">Process The Day</a>
+<a href="/process?uid=""" & params["uid"] & """">Process The Day</a>
 </HTML>
 """
             await req.respond(Http200, msg, headers)
         else:
             await req.respond(Http200, "<HTML>Error. <a href=\"/\">Restart</a></HTML>", headers)
     elif req.url.path == "/process":
+        let params = req.url.query.parseQuery()
+        let uid = params["uid"]
+
         # let today = now() - initDuration(days = 3)
         let today = initDateTime(30, mJan, 2020, 0, 0, 0, utc())
         
-        let plan = await getPlan(sheetId, today, accessToken)
-        let (activity, tw) = await getActivity(today, stravaAccessToken)
+        let plan = await getPlan(uid, today)
+        let (activity, tw) = await getActivity(uid, today)
 
         let pattern = normalize_plan(plan)
         pattern.process(tw["time"], tw["watts"])
@@ -196,7 +200,10 @@ Ok<br/>Hello """ & athlete["firstname"].getStr() & " " & athlete["lastname"].get
     else:
         await req.respond(Http404, "Not Found")
 
-proc getPlan(sheetId: string, dt: DateTime, stravaAccessToken: string): Future[string] {.async.} =
+proc getPlan(uid: string, dt: DateTime): Future[string] {.async.} =
+    let accessToken = get_store(uid, "access_token")
+    let sheetId = get_store(uid, "sheet_id")
+
     let valueRange = "A:E"
     let res = await client.bearerRequest(sheetApi & "/" & sheetId & "/values/" & valueRange & "?majorDimension=ROWS", accessToken)
     let body = await res.body()
@@ -219,7 +226,9 @@ proc getPlan(sheetId: string, dt: DateTime, stravaAccessToken: string): Future[s
 
     return $currentDay
 
-proc getActivity(dt: DateTime, stravaAccessToken: string): Future[(string, Table[string, seq[float]])] {.async.} =
+proc getActivity(uid: string, dt: DateTime): Future[(string, Table[string, seq[float]])] {.async.} =
+    let stravaAccessToken = get_store(uid, "strava_access_token")
+
     let res = await client.bearerRequest(stravaApi & "/athlete/activities?per_page=10", stravaAccessToken)
     let body = await res.body()
     let j = parseJson(body)
