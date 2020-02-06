@@ -24,7 +24,7 @@ proc `$`(a: Interval): string =
     let dstr = fromUnix(a.duration.int).format("mm:ss")
     fmt"(avg: {a.avg}, start: {tstr}, duration: {dstr})"
 
-proc `$`(d: Duration): string =
+proc `$`(d: times.Duration): string =
     let d = d.toParts()
     fmt"{d[Hours]}:{d[Minutes]:02}:{d[Seconds]:02}"
 
