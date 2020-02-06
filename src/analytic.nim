@@ -28,9 +28,9 @@ proc `$`(d: Duration): string =
     let d = d.toParts()
     fmt"{d[Hours]}:{d[Minutes]:02}:{d[Seconds]:02}"
 
-func normalize_plan*(plan: string): seq[Pattern] =
+proc normalize_plan*(plan: string): seq[Pattern] =
     for x in plan.findAll(re"\d+x\d+"):
-        let vals = x.split('s')
+        let vals = x.split('x')
         let pattern: Pattern = (vals[0].parseInt, (60 * vals[1].parseInt).float)
         result.add(pattern)    
 
