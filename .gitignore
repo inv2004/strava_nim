@@ -3,3 +3,6 @@ testdb.db
 pcre64.dll
 testdb.db.bak
 2.json
+libeay64.dll
+ssleay64.dll
+tests/tester.exe
