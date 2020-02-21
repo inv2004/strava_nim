@@ -4,6 +4,8 @@ import sequtils
 import algorithm
 import re
 import strutils
+import math
+import sugar
 
 type
     Interval* = tuple
@@ -19,12 +21,13 @@ type
 func duration(a: Interval): float =
     (a.stop - a.start + 1).float
 
-proc `$`(a: Interval): string =
-    let tstr = fromUnix(a.start).format("mm:ss")
-    let dstr = fromUnix(a.duration.int).format("mm:ss")
-    fmt"(avg: {a.avg}, start: {tstr}, duration: {dstr})"
+proc `$`*(a: Interval): string =
+    let d1 = initDuration(seconds = a.start).toParts()
+    let d2 = initDuration(seconds = a.stop).toParts()
+    let d3 = initDuration(seconds = a.duration().int).toParts()
+    fmt"(avg: {a.avg:0.1f}, start: {d1[Minutes]:02}:{d1[Seconds]:02}, duration: {d3[Minutes]:02}:{d3[Seconds]:02}, stop:{d2[Minutes]:02}:{d2[Seconds]:02})"
 
-proc `$`(d: times.Duration): string =
+proc `$`*(d: times.Duration): string =
     let d = d.toParts()
     fmt"{d[Hours]}:{d[Minutes]:02}:{d[Seconds]:02}"
 
@@ -34,8 +37,9 @@ proc normalize_plan*(plan: string): seq[Pattern] =
         let pattern: Pattern = (vals[0].parseInt, (60 * vals[1].parseInt).float)
         result.add(pattern)    
 
-proc generate_best*(pattern: seq[Pattern], time: seq[float], watts: seq[float]): seq[Interval] =
+proc generate_best*(pattern: seq[Pattern], time: seq[float], watts: seq[float]): seq[seq[Interval]] =
     for (repeat, ws) in pattern:
+        result.add(@[])
         var acc = 0.0
         var i = 0
         for ii, (tt, x) in time.zip(watts):
@@ -46,66 +50,99 @@ proc generate_best*(pattern: seq[Pattern], time: seq[float], watts: seq[float]):
             acc += x
             if t+1 >= ws.int:
                 let interval: Interval = (acc / ws, time[i].int, t)
-                result.add(interval)
+                assert time[i].int <= t
+                result[^1].add(interval)
 
     func cmp2(a, b: Interval): int =
-        result = cmp(a.avg, b.avg)
+        result = cmp(a.avg * a.duration, b.avg * b.duration)
         if result == 0:
             result = cmp(a.start, b.start)
             if result == 0:
                 result = cmp(a.stop, b.stop)
 
-    result.sort(cmp2, Ascending)
+    for x in result.mitems:
+        x.sort(cmp2, Ascending)
 
-proc select_top*(pattern: seq[Pattern], best: seq[Interval]): seq[Interval] =
+func overlap*(a,b: Interval): bool =
+    if a.start <= b.start and a.stop > b.start:
+        return true
+    if b.start <= a.start and b.stop > a.start:
+        return true
+    return false
+
+proc select_top_1*(pattern: seq[Pattern], best: seq[seq[Interval]]): seq[Interval] =
+    result.add best[0][^1]
+
+proc select_top_2*(pattern: seq[Pattern], best: seq[seq[Interval]]): seq[Interval] =
+    var m = 0.0
+
+    for x in best[0]:
+        for y in best[1]:
+            if not(x.stop <= y.start):
+                continue
+
+            let work = x.avg*15*60 + y.avg*180
+            if work > m:
+                result = @[x,y]
+                m = work
+
+proc select_top_3*(pattern: seq[Pattern], best: seq[seq[Interval]]): seq[Interval] =
+    var m = 0.0
+
+    echo "variants: ", best[0].len * (best[1].len ^ 2)
+
+    for x in best[0]:
+        for y in best[1]:
+            if not(x.stop <= y.start):
+                continue
+
+            for z in best[1]:
+                if not(y.stop <= z.start):
+                    continue
+        
+                let work = x.avg*pattern[0].duration + y.avg*pattern[1].duration + z.avg*pattern[1].duration
+                if work > m:
+                    result = @[x,y,z]
+                    m = work
+
+proc select_one(last:int, pattern: Pattern, best: seq[Interval]): seq[Interval] =
     var best = best
-    func overlap(a,b: Interval): bool =
-        if a.start <= b.start and a.stop > b.start:
-            return true
-        if b.start <= a.start and b.stop > a.start:
-            return true
-        return false
+    var repeat = pattern.repeat
 
-    # var ps = pattern
-    # while best.len > 0 and ps.len > 0:
-    #     let x = best.pop()
-    #     for p in ps.mitems:
-    #         if x.duration >= p.duration:
-    #             block checkBlock:
-    #                 for y in result:
-    #                     if overlap(x, y):
-    #                         # echo "overlap ", x, y
-    #                         break checkBlock
-    #                 result.add(x)
-    #                 p[0] -= 1
-    #     ps.keepItIf(it[0] > 0)
-    #     echo $ps
+    while best.len > 0 and repeat > 0:
+        let x = best.pop()
+        if not(last <= x.start):
+            continue
+        if result.anyIt(overlap(it, x)):
+            continue
+        result.add(x)
+        repeat -= 1
 
-    for (p, res) in pattern.zip(best):
-        var repeat = p.repeat
-        let ws = p.duration
-        while best.len > 0 and repeat > 0:
-            let x = best.pop()
-            if x.duration >= ws:
-                if result.allIt(not overlap(x, it)):
-                    result.add(x)
-                    repeat -= 1
+    if repeat > 0:
+        echo "not all interval found"
+        return @[]
 
-    func cmp3(a, b: Interval): int =
-        result = cmp(a.start, b.start)
-        if result == 0:
-            result = cmp(a.avg, b.avg)
-            if result == 0:
-                result = cmp(a.stop, b.stop)
+proc select_top_33*(pattern: seq[Pattern], best: seq[seq[Interval]]): seq[Interval] =
+    let p1 = select_one(0, pattern[0], best[0])
+    let p2 = select_one(p1[0].stop, pattern[1], best[1])
+    echo p2
 
-    result.sort(cmp3, Ascending)
 
-proc process*(pattern: seq[Pattern], time: seq[float], watts: seq[float]) =
+proc select_top*(pattern: seq[Pattern], best: seq[seq[Interval]]): seq[Interval] =
+    let count = pattern.map(x => x.repeat).sum()
+    if count == 1:
+        return pattern.select_top_1(best)
+    elif count == 2:
+        return pattern.select_top_2(best)
+    elif count == 3:
+        return pattern.select_top_3(best)
+
+proc process*(pattern: seq[Pattern], time: seq[float], watts: seq[float]): seq[Interval] =
     echo "processing ", pattern
 
     let best = pattern.generate_best(time, watts)
-    let found = pattern.select_top(best) 
+    pattern.select_top(best) 
 
-    for x in found:
-        echo x
-    
+
+
+z
