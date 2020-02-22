@@ -6,3 +6,4 @@ testdb.db.bak
 libeay64.dll
 ssleay64.dll
 tests/tester.exe
+src/analytic.exe

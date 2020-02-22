@@ -185,7 +185,7 @@ Ok<br/>Hello """ & athlete["firstname"].getStr() & " " & athlete["lastname"].get
         let (activity, tw) = await getActivity(uid, today)
 
         let pattern = normalize_plan(plan)
-        pattern.process(tw["time"], tw["watts"])
+        let res = pattern.process(tw["time"], tw["watts"])
 
         let msg = """
 <HTML>
@@ -193,6 +193,7 @@ Ok<br/>Hello """ & athlete["firstname"].getStr() & " " & athlete["lastname"].get
         <tr><td>Today:</td><td>""" & today.format("YYYY-MM-dd") & """</td></tr>
         <tr><td>Plan:</td><td>""" & plan & """</td></tr>
         <tr><td>Activity:</td><td>""" & activity & """</td></tr>
+        <tr><td>Activity:</td><td>""" & $res & """</td></tr>
     </table>
 </HTML>
 """

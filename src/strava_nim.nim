@@ -2,7 +2,7 @@
 import asynchttpserver, asyncdispatch
 import tables
 import sequtils
-import strutils
+# import strutils
 import json
 import times
 import strformat
@@ -25,7 +25,7 @@ proc main2() {.async.} =
     let t = j3.getElems().map(x => (x["type"].getStr, x["data"].getElems().map(y => y.getFloat))).toTable
     if t["time"].len != t["watts"].len:
         raise newException(ValueError, "Streams are not equal len")
-    "1x15 (240) + 7x3 (310)".normalize_plan().process(t["time"], t["watts"])
+    echo "1x15 (240) + 2x3 (310)".normalize_plan().process(t["time"], t["watts"])
     # "1x15 (240)".normalize_plan().process(t["time"], t["watts"])
     # "7x3 (240)".normalize_plan().process(t["time"], t["watts"])
 
