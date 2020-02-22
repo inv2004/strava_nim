@@ -14,12 +14,17 @@ test "one":
     let res = @[(1,4.0)].process(t, w)
     res.assert_eq @[(32.5, 2, 5)]
 
+test "two":
+    let t = @[0,  1,  2,  3,  4,  5 ].map(x => x.float)
+    let w = @[10, 10, 20, 30, 40, 40].map(x => x.float)
+    let res = @[(2,2.0)].process(t, w)
+    res.assert_eq @[(35.0, 3, 4), (40.0, 4, 5)]
+
 test "simple":
     let t = @[0,   1,  2,  3,  4, 5].map(x => x.float)
     let w = @[10, 20, 30, 20, 10, 5].map(x => x.float)
     let res = @[(1,2.0), (1,3.0)].process(t, w)
     res.assert_eq @[(25.0, 1, 2), (20.0, 2, 4)]
-
 
 test "skip_time":
     let t = @[0,   1,  3,  4, 5].map(x => x.float)

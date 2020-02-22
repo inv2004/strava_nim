@@ -105,6 +105,44 @@ proc select_top_3*(pattern: seq[Pattern], best: seq[seq[Interval]]): seq[Interva
                     result = @[x,y,z]
                     m = work
 
+proc select_all*(pattern: seq[Pattern], best: seq[seq[Interval]]): seq[Interval] =
+
+    let total = pattern.zip(best).mapIt(it[1].len ^ it[0].repeat).prod()
+    echo total
+    var i = 0
+    var m = 0.0
+    var candidate = newSeq[Interval]()
+
+    proc step(left: seq[Interval], acc:float, pattern: seq[Pattern], best: seq[seq[Interval]]) =
+        if pattern.len == 0:
+            if acc > m:
+                m = acc
+                candidate = left
+        else:
+            for x in best[0]:
+                if i mod 1_000_000 == 0:
+                    echo fmt"{(100 * i) / total:.10f}%"
+                i.inc()
+                if left.len > 0 and not(left[^1].stop <= x.start):
+                    continue
+                let acc = acc + x.avg * x.duration
+                if pattern[0].repeat == 1:
+                    step(left & x, acc, pattern[1..pattern.high], best[1..best.high])
+                else:
+                    var newP = pattern
+                    newP[0].repeat.dec()
+                    step(left & x, acc, newP, best)
+
+    step(@[], 0.0, pattern, best)
+    return candidate
+    
+# when isMainModule:
+#     let pattern = @[(1,4.0), (2,2.0)]
+#     let t = @[0,  1,  2,  3,  4,  5 ].map(x => x.float)
+#     let w = @[10, 10, 20, 30, 40, 40].map(x => x.float)
+#     let best = pattern.generate_best(t, w)
+#     echo pattern.select_all(best)
+
 proc select_one(last:int, pattern: Pattern, best: seq[Interval]): seq[Interval] =
     var best = best
     var repeat = pattern.repeat
@@ -140,9 +178,13 @@ proc select_top*(pattern: seq[Pattern], best: seq[seq[Interval]]): seq[Interval]
 proc process*(pattern: seq[Pattern], time: seq[float], watts: seq[float]): seq[Interval] =
     echo "processing ", pattern
 
-    let best = pattern.generate_best(time, watts)
-    pattern.select_top(best) 
+    var best = pattern.generate_best(time, watts)
+    for x in best.mitems:
+        x = x[0..<1000]
+
+    for x in best:
+        echo x.len
+
+    pattern.select_all(best) 
 
 
-
-z
