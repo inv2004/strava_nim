@@ -175,16 +175,33 @@ proc process_old*(pattern: seq[Pattern], time: seq[float], watts: seq[float]): s
     pattern.select_all(best) 
 
 proc process*(pattern: seq[Pattern], time: seq[float], watts: seq[float]): seq[Interval] =
-  echo "processing: ", pattern
+#   echo "processing: ", pattern
 
-  let n = watts.len
+#   echo "time: ", time
+#   echo "watt: ", watts
+
   var sums = @[0]
   var current_sum = 0
-  for val in watts:
+
+  var prev_t = -1.0
+  var prev_val = 0.0
+
+  for (t, val) in time.zip(watts):
+    let t_diff = (t-prev_t).int
+    if t_diff > 2:
+        for i in countup(1, t_diff-1):
+            current_sum += 1
+            sums.add(current_sum)
+    elif t_diff == 2:
+        current_sum += int((prev_val + val) / 2)
+        sums.add(current_sum)
+
     current_sum += val.int + 1
     sums.add(current_sum)
+    prev_t = t
+    prev_val = val
 
-  echo "DEBUG1: ",sums
+  let n = sums.len - 1
 
   var template_list: seq[int] = @[]
   for val in pattern:
@@ -194,8 +211,6 @@ proc process*(pattern: seq[Pattern], time: seq[float], watts: seq[float]): seq[I
   let m = template_list.len
   if m == 0:
     return @[]
-
-  echo "DEBUG2: ",template_list
 
   var dyn_arr: seq[seq[int]] = @[]
 
@@ -227,9 +242,6 @@ proc process*(pattern: seq[Pattern], time: seq[float], watts: seq[float]): seq[I
       if max_in_prev < prev_arr[i + 1 - val]:
         max_in_prev = prev_arr[i + 1 - val]
     dyn_arr.add(next_arr)
-
-  for x in dyn_arr:
-    echo "DEBUG3: ",x
 
   var ret_val = 0
   var ret_pos = -1
@@ -263,7 +275,7 @@ proc process*(pattern: seq[Pattern], time: seq[float], watts: seq[float]): seq[I
   for j in template_list:
     ret_val -= j
 
-  echo "solution:   ", solution
+#   echo "solution:   ", solution
 
   return solution
 
