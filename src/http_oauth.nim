@@ -111,7 +111,7 @@ proc http_handler*(req: Request) {.async, gcsafe.} =
         let body =  await resp.body()
         let j = parseJson(body)
         echo j
-        if j.contains("access_token"):
+        if j.contains("access_token") and j.contains("refresh_token") and j.contains("expires_in"):
             let accessToken = j["access_token"].getStr()
 
             let profile = await email_test(accessToken)
@@ -120,6 +120,8 @@ proc http_handler*(req: Request) {.async, gcsafe.} =
 
             store(profile, accessToken)
             upd_store(uid, "refresh_token", j["refresh_token"].getStr)
+            let exp = (getTime() + initDuration(seconds=j["expires_in"].getInt)).toUnix()
+            upd_store(uid, "expiration", $exp)
             upd_store(uid, "sheet_id", params["sheet_id"])
 
             let res2 = await sheet_test(params["sheet_id"], accessToken)
@@ -159,9 +161,12 @@ proc http_handler*(req: Request) {.async, gcsafe.} =
         )
         let body =  await resp.body()
         let j = parseJson(body)
-        # echo j.pretty
-        if j.contains("access_token"):
+        echo j.pretty
+        if j.contains("access_token") and j.contains("refresh_token") and j.contains("expires_in"):
             upd_store(uid, "strava_access_token", j["access_token"].getStr)
+            upd_store(uid, "strava_refresh_token", j["refresh_token"].getStr)
+            let exp = (getTime() + initDuration(seconds=j["expires_in"].getInt)).toUnix()
+            upd_store(uid, "strava_expiration", $exp)
 
             let athlete = j["athlete"]
             let msg = """
