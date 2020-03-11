@@ -61,7 +61,7 @@ test "find_best_2":
 
 test "find_best_fail":
     let t = @[0,  1,  2,  3,  4,  5,  6,  7 ].map(x => x.float)
-    let w = @[10, 10, 20, 30, 40, 40, 50, 52].map(x => x.float)
+    let w = @[10, 10, 20, 30, 40, 40, 50, 50].map(x => x.float)
     let res = @[(1,4.0), (1,2.0), (1,3.0)].process(t, w)
     let empty: seq[Interval] = @[]
     res.assert_eq empty

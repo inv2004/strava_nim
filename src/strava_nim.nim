@@ -31,8 +31,8 @@ proc main2() {.async.} =
 
 when isMainModule:
     try:
-        # waitFor server.serve(Port(8080), http_handler)
-        waitFor main2()
+        waitFor server.serve(Port(8080), http_handler)
+        # waitFor main2()
     except:
         echo "Exception: " & getCurrentExceptionMsg()
 
