@@ -108,7 +108,7 @@ proc select_top_3*(pattern: seq[Pattern], best: seq[seq[Interval]]): seq[Interva
 proc select_all*(pattern: seq[Pattern], best: seq[seq[Interval]]): seq[Interval] =
 
     let total = pattern.zip(best).mapIt(it[1].len ^ it[0].repeat).prod()
-    echo total
+    #echo total
     var i = 0
     var m = 0.0
     var candidate = newSeq[Interval]()
@@ -120,8 +120,8 @@ proc select_all*(pattern: seq[Pattern], best: seq[seq[Interval]]): seq[Interval]
                 candidate = left
         else:
             for x in best[0]:
-                if i mod 1_000_000 == 0:
-                    echo fmt"{(100 * i) / total:.10f}%"
+                #if i mod 1_000_000 == 0:
+                #    echo fmt"{(100 * i) / total:.10f}%"
                 i.inc()
                 if left.len > 0 and not(left[^1].stop <= x.start):
                     continue
@@ -136,13 +136,6 @@ proc select_all*(pattern: seq[Pattern], best: seq[seq[Interval]]): seq[Interval]
     step(@[], 0.0, pattern, best)
     return candidate
     
-# when isMainModule:
-#     let pattern = @[(1,4.0), (2,2.0)]
-#     let t = @[0,  1,  2,  3,  4,  5 ].map(x => x.float)
-#     let w = @[10, 10, 20, 30, 40, 40].map(x => x.float)
-#     let best = pattern.generate_best(t, w)
-#     echo pattern.select_all(best)
-
 proc select_one(last:int, pattern: Pattern, best: seq[Interval]): seq[Interval] =
     var best = best
     var repeat = pattern.repeat
@@ -175,16 +168,108 @@ proc select_top*(pattern: seq[Pattern], best: seq[seq[Interval]]): seq[Interval]
     elif count == 3:
         return pattern.select_top_3(best)
 
-proc process*(pattern: seq[Pattern], time: seq[float], watts: seq[float]): seq[Interval] =
+proc process_old*(pattern: seq[Pattern], time: seq[float], watts: seq[float]): seq[Interval] =
     echo "processing ", pattern
 
-    var best = pattern.generate_best(time, watts)
-    for x in best.mitems:
-        x = x[0..<1000]
-
-    for x in best:
-        echo x.len
-
+    let best = pattern.generate_best(time, watts)
     pattern.select_all(best) 
 
+proc process*(pattern: seq[Pattern], time: seq[float], watts: seq[float]): seq[Interval] =
+  echo "processing: ", pattern
+
+  let n = watts.len
+  var sums = @[0]
+  var current_sum = 0
+  for val in watts:
+    current_sum += val.int + 1
+    sums.add(current_sum)
+
+  echo "DEBUG1: ",sums
+
+  var template_list: seq[int] = @[]
+  for val in pattern:
+    for i in 1..val.repeat:
+      template_list.add(val.duration.int)
+
+  let m = template_list.len
+  if m == 0:
+    return @[]
+
+  echo "DEBUG2: ",template_list
+
+  var dyn_arr: seq[seq[int]] = @[]
+
+  var first_arr: seq[int] = @[]
+  let val = template_list[0]
+  for i in 1..n:
+    if i < val:
+      first_arr.add(0)
+      continue
+    first_arr.add(sums[i] - sums[i-val])
+
+  dyn_arr.add(first_arr)
+
+  for j in 1..<m:
+    let prev_arr: seq[int] = dyn_arr[j-1]
+    var max_in_prev = 0
+    var next_arr: seq[int] = @[]
+    let val = template_list[j]
+
+    for i in 0..<n:
+      if i + 1 < val:
+        next_arr.add(0)
+        continue
+      let last = sums[i+1] - sums[i+1-val]
+      if max_in_prev > 0:
+        next_arr.add(max_in_prev + last)
+      else:
+        next_arr.add(0)
+      if max_in_prev < prev_arr[i + 1 - val]:
+        max_in_prev = prev_arr[i + 1 - val]
+    dyn_arr.add(next_arr)
+
+  for x in dyn_arr:
+    echo "DEBUG3: ",x
+
+  var ret_val = 0
+  var ret_pos = -1
+  for i in 0..<n:
+    let j = dyn_arr[m-1][i]
+    if j > ret_val:
+      ret_val = j
+      ret_pos = i
+
+  if ret_val == 0:
+    return @[]
+
+  var solution = newSeq[Interval](m)
+  var sum_all = ret_val
+  var pos_y = m - 1
+  var pos_x = ret_pos
+
+  while pos_y >= 0:
+    if dyn_arr[pos_y][pos_x] == sum_all:
+      let len_val = template_list[pos_y]
+      let sum_val = sums[pos_x+1] - sums[pos_x+1-len_val]
+      let avg = (sum_val - len_val).float / len_val.float
+      let i: Interval = (avg, pos_x+1-len_val, pos_x)
+      solution[pos_y] = i
+      pos_x -= len_val
+      pos_y -= 1
+      sum_all -= sum_val
+    else:
+      pos_x = pos_x - 1
+
+  for j in template_list:
+    ret_val -= j
+
+  echo "solution:   ", solution
+
+  return solution
+
+when isMainModule:
+  let pattern = @[(1,4.0), (2,2.0)]
+  let t = @[0,  1,  2,  3,  4,  5,  6,  7 ].map(x => x.float)
+  let w = @[10, 10, 20, 30, 40, 40, 50, 60].map(x => x.float)
+  echo pattern.process(t, w)
 
