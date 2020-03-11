@@ -31,7 +31,14 @@ test "skip_time":
     let w = @[10, 20, 20, 10, 5].map(x => x.float)
     var res = @[(1,2.0), (1,3.0)].process(t, w)
     res[1][0] = res[1][0].floor
-    res.assert_eq @[(15.0, 0, 1), (13.0, 1, 3)]
+    res.assert_eq @[(15.0, 0, 1), (16.0, 2, 4)]
+
+test "skip_time_2":
+    let t = @[0,   1,  4,  4, 5].map(x => x.float)
+    let w = @[10, 20, 20, 10, 5].map(x => x.float)
+    var res = @[(1,2.0), (1,3.0)].process(t, w)
+    res[1][0] = res[1][0].floor
+    res.assert_eq @[(15.0, 0, 1), (11.0, 4, 6)]
 
 test "overlap":
     let i1: Interval = (10.0, 0, 2)
@@ -54,7 +61,7 @@ test "find_best_2":
 
 test "find_best_fail":
     let t = @[0,  1,  2,  3,  4,  5,  6,  7 ].map(x => x.float)
-    let w = @[10, 10, 20, 30, 40, 40, 50, 50].map(x => x.float)
+    let w = @[10, 10, 20, 30, 40, 40, 50, 52].map(x => x.float)
     let res = @[(1,4.0), (1,2.0), (1,3.0)].process(t, w)
     let empty: seq[Interval] = @[]
     res.assert_eq empty
