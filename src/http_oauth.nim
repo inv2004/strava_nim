@@ -12,7 +12,6 @@ import strutils
 import tables
 import sugar
 
-
 import storage
 import times
 import analytic
@@ -21,6 +20,7 @@ import analytic
 const
     clientId = "438197548914-kp6b5mu5543gdinspvt5tgj0s71q1vbv.apps.googleusercontent.com"
     clientSecret = "F3FV-r9obIVHG3gW6JvDP95m"
+    clientScope = @["https://www.googleapis.com/auth/spreadsheets","email"]
     authorizeUrl = "https://accounts.google.com/o/oauth2/v2/auth"
     accessTokenUrl = "https://accounts.google.com/o/oauth2/token"
     redirectUri = "http://localhost:8080"
@@ -28,6 +28,7 @@ const
     userinfoApi = "https://www.googleapis.com/userinfo/v2/me"
     stravaClientId = "18057"
     stravaClientSecret = "05e15bf725a7c4ee80fcd6683c8bebd5a5811cef"
+    stravaClientScope = @["activity:read_all"]
     stravaAuthorizeUrl = "http://www.strava.com/oauth/authorize"
     stravaAccessTokenUrl = "https://www.strava.com/oauth/token"
     stravaApi = "https://www.strava.com/api/v3"
@@ -77,8 +78,7 @@ proc http_handler*(req: Request) {.async, gcsafe.} =
             clientId,
             redirectUri & "/gcode",
             state,
-            @["https://www.googleapis.com/auth/spreadsheets",
-              "email"],
+            clientScope,
             accessType = "offline"
         )
         headers["Location"] = grantUrl
@@ -142,7 +142,7 @@ proc http_handler*(req: Request) {.async, gcsafe.} =
             stravaClientId,
             redirectUri & "/scode?uid=" & params["uid"],
             state,
-            @["activity:read_all"],
+            stravaClientScope,
             accessType = "offline"
         )
         headers["Location"] = grantUrl
@@ -273,4 +273,54 @@ proc getActivity(uid: string, dt: DateTime): Future[(string, Table[string, seq[f
     file.close()
     
     return (j2["name"].getStr() & " " & $j2["distance"].getFloat() & "m " & j2["type"].getStr(), t)
+
+proc refresh_google(uid: string): Future[string] {.async.} =
+    let exp = get_store(uid, "expiration").parseInt
+    if exp < getTime().toUnix():
+        let refreshToken = get_store(uid, "refresh_token")
+        echo "refresh"
+        let state = generateState()
+        let res = await client.refreshToken(accessTokenUrl, clientId, clientSecret, refreshToken, clientScope, useBasicAuth = false);
+        let body = await res.body()
+        let j = parseJson(body)
+
+        if j.contains("access_token") and j.contains("expires_in"):
+            upd_store(uid, "access_token", j["access_token"].getStr)
+            let exp = (getTime() + initDuration(seconds=j["expires_in"].getInt)).toUnix()
+            upd_store(uid, "expiration", $exp)
+        else:
+            raise newException(ValueError, "cannot refresh token")
+    else:
+        echo "using access"
+
+    return get_store(uid, "access_token")
+    
+proc refresh_strava(uid: string): Future[string] {.async.} =
+    let exp = get_store(uid, "strava_expiration").parseInt
+    if exp < getTime().toUnix():
+        let refreshToken = get_store(uid, "strava_refresh_token")
+        echo "refresh"
+        let state = generateState()
+        let res = await client.refreshToken(stravaAccessTokenUrl, stravaClientId, stravaClientSecret, refreshToken, stravaClientScope, useBasicAuth = false);
+        let body = await res.body()
+        echo body
+        let j = parseJson(body)
+
+        if j.contains("access_token") and j.contains("expires_in"):
+            upd_store(uid, "strava_access_token", j["access_token"].getStr)
+            let exp = (getTime() + initDuration(seconds=j["expires_in"].getInt)).toUnix()
+            upd_store(uid, "strava_expiration", $exp)
+        else:
+            raise newException(ValueError, "cannot refresh token for strava")
+    else:
+        echo "using access"
+
+    return get_store(uid, "strava_access_token")
+
+proc start*() {.async.} =
+    let uid = "108740387807973236065"
+    let access = await refresh_google(uid)
+    echo access
+    let stravaAccess = await refresh_strava(uid)
+    echo stravaAccess
 
