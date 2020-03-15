@@ -66,3 +66,15 @@ test "find_best_fail":
     let empty: seq[Interval] = @[]
     res.assert_eq empty
 
+test "format_result":
+    var a: seq[Interval] = @[]
+    a.add (avg: 176.7, start: 60*00+41, stop:60*20+40)
+    a.add (avg: 305.0, start: 60*21+32, stop:60*24+31)
+    a.add (avg: 306.6, start: 60*27+25, stop:60*30+24)
+    a.add (avg: 285.6, start: 60*33+25, stop:60*36+24)
+    a.add (avg: 195.0, start: 60*39+23, stop:60*42+22)
+    a.add (avg: 241.2, start: 60*45+28, stop:60*48+27)
+    a.add (avg: 254.9, start: 60*51+36, stop:60*54+35)
+    a.add (avg: 224.4, start: 60*57+31, stop:60*60+30)
+    let str = a.normalize_result()
+    str.assert_eq "1x20(176) + 7x3(305 306 285 195 241 254 224)"

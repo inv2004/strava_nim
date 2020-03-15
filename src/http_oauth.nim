@@ -32,6 +32,7 @@ const
     stravaAuthorizeUrl = "http://www.strava.com/oauth/authorize"
     stravaAccessTokenUrl = "https://www.strava.com/oauth/token"
     stravaApi = "https://www.strava.com/api/v3"
+    stravaPageLimit = 100
 
 let client = newAsyncHttpClient()
 
@@ -186,7 +187,7 @@ Ok<br/>Hello """ & athlete["firstname"].getStr() & " " & athlete["lastname"].get
         # let today = now() - initDuration(days = 3)
         let today = initDateTime(30, mJan, 2020, 0, 0, 0, utc())
         
-        let plan = await getPlan(uid, today)
+        let (plan, _, _) = await getPlan(uid, today)
         let (activity, tw) = await getActivity(uid, today)
 
         let pattern = normalize_plan(plan)
@@ -206,36 +207,67 @@ Ok<br/>Hello """ & athlete["firstname"].getStr() & " " & athlete["lastname"].get
     else:
         await req.respond(Http404, "Not Found")
 
-proc getPlan(uid: string, dt: DateTime): Future[string] {.async.} =
+proc getPlan(uid: string, dt: DateTime): Future[(string, int, string)] {.async.} =
     let accessToken = get_store(uid, "access_token")
     let sheetId = get_store(uid, "sheet_id")
 
-    let valueRange = "A:E"
+    let valueRange = "A:J"
     let res = await client.bearerRequest(sheetApi & "/" & sheetId & "/values/" & valueRange & "?majorDimension=ROWS", accessToken)
     let body = await res.body()
     let j = parseJson(body)
 
     let today_str = dt.format("M/d/YYYY")
 
-    proc checkFirst(x: JsonNode): bool =
+    proc mapDate(x: JsonNode): string =
         let row = x.getElems()
         if row.len > 0:
-            row[0].getStr("") == today_str
+            row[0].getStr("")
         else:
-            false
-    
-    let foundDates = j["values"].getElems().filter(checkFirst)
-    if foundDates.len == 0:
+            ""
+
+    let elems = j["values"].getElems()
+    let idx = elems.mapIt(it.mapDate()).find(today_str)
+
+    # let foundDates = j["values"].getElems().filter(checkFirst)
+    if idx == -1:
         raise newException(ValueError, "No records found in sheet")
     
-    let currentDay = foundDates[0][4]
+    let currentDay = elems[idx][4].getStr
+    let text = if elems[idx].len >= 10: elems[idx][9].getStr else: ""
 
-    return $currentDay
+    echo "Current plan: ", currentDay, "    row: ", idx+1, "    text: ", text
 
+    return (currentDay, idx+1, text)
+
+proc setResult(uid: string, row: int, text, res: string) {.async.} =
+    let accessToken = get_store(uid, "access_token")
+    let sheetId = get_store(uid, "sheet_id")
+
+    let valueRange = "J" & $row
+
+    let old = if text.len > 0: "\n  old: " & text else: ""
+
+    let jReq = %*{
+        "range": valueRange,
+        "majorDimension": "ROWS",
+        "values": [[ " bot: " & res & old]]
+    }
+
+    var headers = newHttpHeaders([("Content-Type", "application/json")])
+
+    let res = await client.bearerRequest(sheetApi & "/" & sheetId & "/values/" & valueRange & "?valueInputOption=RAW", accessToken, httpMethod = HttpPut, body = $jReq, extraHeaders = headers)
+
+    let body = await res.body()
+    let j = parseJson(body)
+    if j.contains("updatedCells") and j["updatedCells"].getInt == 1:
+        echo "Result updated"
+    else:
+        raise newException(ValueError, "error during cell update")
+    
 proc getActivity(uid: string, dt: DateTime): Future[(string, Table[string, seq[float]])] {.async.} =
     let stravaAccessToken = get_store(uid, "strava_access_token")
 
-    let res = await client.bearerRequest(stravaApi & "/athlete/activities?per_page=10", stravaAccessToken)
+    let res = await client.bearerRequest(stravaApi & "/athlete/activities?per_page=" & $stravaPageLimit, stravaAccessToken)
     let body = await res.body()
     let j = parseJson(body)
 
@@ -250,8 +282,11 @@ proc getActivity(uid: string, dt: DateTime): Future[(string, Table[string, seq[f
 
     let currentActivity = foundActivities[0]
 
-    echo "Current activity: ", currentActivity["name"]
+    echo "Strava activity name: ", currentActivity["name"]
     let id = currentActivity["id"].getBiggestInt
+
+    let utc_offset = currentActivity["utc_offset"].getFloat
+    upd_store(uid, "utc_offset", $utc_offset)
 
     echo "get: " & stravaApi & "/activities/" & $id & "?include_all_efforts=false"
 
@@ -317,10 +352,19 @@ proc refresh_strava(uid: string): Future[string] {.async.} =
 
     return get_store(uid, "strava_access_token")
 
-proc start*() {.async.} =
-    let uid = "108740387807973236065"
+proc start*(uid = "108740387807973236065") {.async.} =
     let access = await refresh_google(uid)
-    echo access
     let stravaAccess = await refresh_strava(uid)
-    echo stravaAccess
+    # let today = initDateTime(30, mJan, 2020, 0, 0, 0, utc())
+    let today = now()
+
+    let (plan, row, text) = await getPlan(uid, today)
+    let (activity, tw) = await getActivity(uid, today)
+
+    let pattern = normalize_plan(plan)
+    let res = pattern.process(tw["time"], tw["watts"])
+
+    let resStr = res.normalize_result()
+    echo "Result: ", resStr
+    await setResult(uid, row, text, resStr)
 
