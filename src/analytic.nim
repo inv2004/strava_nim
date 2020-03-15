@@ -37,6 +37,37 @@ proc normalize_plan*(plan: string): seq[Pattern] =
         let pattern: Pattern = (vals[0].parseInt, (60 * vals[1].parseInt).float)
         result.add(pattern)    
 
+proc fmt_duration(x: float): string =
+    let x = x.int
+    if x mod 3600 == 0:
+        result = $(x div 3600) & "h"
+    if x mod 60 == 0:
+        result = $(x div 60)
+    else:
+        result = ($x) & "s"
+    
+
+proc normalize_result*(found: seq[Interval]): string =
+    var prev : (int, float, seq[int]) = (0, 0.0, @[])
+
+    for x in found:
+        if x.duration == prev[1]:
+            prev[0].inc
+            prev[2].add(x.avg.int)
+        else:
+            if prev[0] > 0:
+                if result.len > 0:
+                    result &= " + "
+                let ints = prev[2].join(" ")
+                result &= fmt "{prev[0]}x{prev[1].fmt_duration}({ints})"
+            prev = (1, x.duration, @[x.avg.int])
+
+    if prev[0] > 0:
+        if result.len > 0:
+            result &= " + "
+        let ints = prev[2].join(" ")
+        result &= fmt "{prev[0]}x{prev[1].fmt_duration}({ints})"
+
 proc generate_best*(pattern: seq[Pattern], time: seq[float], watts: seq[float]): seq[seq[Interval]] =
     for (repeat, ws) in pattern:
         result.add(@[])
