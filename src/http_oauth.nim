@@ -240,6 +240,10 @@ proc getPlan(uid: string, dt: DateTime): Future[(string, int, string)] {.async.}
     return (currentDay, idx+1, text)
 
 proc setResult(uid: string, row: int, text, res: string) {.async.} =
+
+    if res.len == 0:
+        return
+
     let accessToken = get_store(uid, "access_token")
     let sheetId = get_store(uid, "sheet_id")
 
@@ -352,11 +356,12 @@ proc refresh_strava(uid: string): Future[string] {.async.} =
 
     return get_store(uid, "strava_access_token")
 
-proc start*(uid = "108740387807973236065") {.async.} =
+proc start*() {.async.} =
+    let uid = "108740387807973236065"
     let access = await refresh_google(uid)
     let stravaAccess = await refresh_strava(uid)
     # let today = initDateTime(30, mJan, 2020, 0, 0, 0, utc())
-    let today = now()
+    let today = now() # - initDuration(days = 2)
 
     let (plan, row, text) = await getPlan(uid, today)
     let (activity, tw) = await getActivity(uid, today)
