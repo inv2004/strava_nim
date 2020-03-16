@@ -1,5 +1,5 @@
 
-import asynchttpserver, asyncdispatch
+import asyncdispatch
 import tables
 import sequtils
 # import strutils
@@ -9,14 +9,12 @@ import strformat
 import algorithm
 import asyncfile
 import sugar
+import os
 
 import analytic
 import storage
 import http_oauth
 
-var server = newAsyncHttpServer()
-
-    
 proc main2() {.async.} =
     var file = openAsync("2.json", fmRead)
     let body3 = await file.readAll()
@@ -31,9 +29,12 @@ proc main2() {.async.} =
 
 when isMainModule:
     try:
-        # waitFor server.serve(Port(8080), http_handler)
-        waitFor process_all()
-        # waitFor main2()
+        let reg = if os.paramCount() >= 1 and os.paramStr(1) == "--reg": true else: false
+
+        if reg:
+            waitFor http()
+        else:
+            waitFor process_all()
     except:
         echo "Exception: " & getCurrentExceptionMsg()
 
