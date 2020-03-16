@@ -105,8 +105,8 @@ func overlap*(a, b: Interval): bool =
 
 proc select_all*(pattern: seq[Pattern], best: seq[seq[Interval]]): seq[Interval] =
 
-    let total = pattern.zip(best).mapIt(it[1].len ^ it[0].repeat).prod()
-    #echo total
+    # let total = pattern.zip(best).mapIt(it[1].len ^ it[0].repeat).prod()
+    # echo total
     var i = 0
     var m = 0.0
     var candidate = newSeq[Interval]()
