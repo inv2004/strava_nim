@@ -30,3 +30,7 @@ testdb.db contains jsons with tokens
 > .\strave_nim.exe
 ```
 
+### Tests
+```shell
+> nimble.exe test
+```
