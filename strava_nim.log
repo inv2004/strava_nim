@@ -1,0 +1,20 @@
+[23:23:08] - INFO: Processing 108740387807973236065 (inv2004@gmail.com)
+[23:23:08] - INFO: Checking token for 
+[23:23:08] - INFO: Using active token
+[23:23:08] - INFO: Checking token for strava_
+[23:23:08] - INFO: Using active token
+[23:23:08] - DEBUG: Requesting current plan
+[23:23:09] - DEBUG: Current day found in plan
+[23:23:09] - INFO: Current plan: off    row: 2691    text: 
+[23:23:13] - WARN: No records found in strava
+Async traceback:
+  C:\Users\unknown\z\strava_nim\src\strava_nim.nim(35)                     strava_nim
+  C:\Users\unknown\scoop\apps\nim\current\lib\pure\asyncdispatch.nim(1879) waitFor
+  C:\Users\unknown\scoop\apps\nim\current\lib\pure\asyncdispatch.nim(1569) poll
+  C:\Users\unknown\scoop\apps\nim\current\lib\pure\asyncdispatch.nim(379)  runOnce
+  C:\Users\unknown\scoop\apps\nim\current\lib\pure\asyncdispatch.nim(210)  processPendingCallbacks
+  C:\Users\unknown\scoop\apps\nim\current\lib\pure\asyncmacro.nim(34)      getActivityNimAsyncContinue
+  C:\Users\unknown\z\strava_nim\src\http_oauth.nim(302)                    getActivityIter
+Exception message: No records found in strava
+Exception type:
+[23:23:13] - INFO: done

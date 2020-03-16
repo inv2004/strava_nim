@@ -11,11 +11,15 @@ import sequtils
 import strutils
 import tables
 import sugar
+import logging
+import strformat
 
 import storage
 import times
 import analytic
 
+type
+    MyError* = object of Exception
 
 const
     clientId = "438197548914-kp6b5mu5543gdinspvt5tgj0s71q1vbv.apps.googleusercontent.com"
@@ -33,6 +37,13 @@ const
     stravaAccessTokenUrl = "https://www.strava.com/oauth/token"
     stravaApi = "https://www.strava.com/api/v3"
     stravaPageLimit = 100
+
+let fmtStr = "[$time] - $levelname: "
+var consoleLog = newConsoleLogger(fmtStr = fmtStr)
+var rollingLog = newRollingFileLogger("strava_nim.log", fmtStr = fmtStr)
+
+addHandler(consoleLog)
+addHandler(rollingLog)
 
 let client = newAsyncHttpClient()
 
@@ -111,7 +122,7 @@ proc http_handler*(req: Request) {.async, gcsafe.} =
         )
         let body =  await resp.body()
         let j = parseJson(body)
-        echo j
+        debug j
         if j.contains("access_token") and j.contains("refresh_token") and j.contains("expires_in"):
             let accessToken = j["access_token"].getStr()
 
@@ -162,7 +173,7 @@ proc http_handler*(req: Request) {.async, gcsafe.} =
         )
         let body =  await resp.body()
         let j = parseJson(body)
-        echo j.pretty
+        debug j
         if j.contains("access_token") and j.contains("refresh_token") and j.contains("expires_in"):
             upd_store(uid, "strava_access_token", j["access_token"].getStr)
             upd_store(uid, "strava_refresh_token", j["refresh_token"].getStr)
@@ -195,12 +206,14 @@ Ok<br/>Hello """ & athlete["firstname"].getStr() & " " & athlete["lastname"].get
 
         let msg = """
 <HTML>
+    Example:
     <table border=3>
         <tr><td>Today:</td><td>""" & today.format("YYYY-MM-dd") & """</td></tr>
         <tr><td>Plan:</td><td>""" & plan & """</td></tr>
         <tr><td>Activity:</td><td>""" & activity & """</td></tr>
         <tr><td>Activity:</td><td>""" & $res & """</td></tr>
     </table>
+    Your auth is saved and will be processes automatically
 </HTML>
 """
         await req.respond(Http200, msg, headers)
@@ -208,6 +221,7 @@ Ok<br/>Hello """ & athlete["firstname"].getStr() & " " & athlete["lastname"].get
         await req.respond(Http404, "Not Found")
 
 proc getPlan(uid: string, dt: DateTime): Future[(string, int, string)] {.async.} =
+    debug "Requesting current plan"
     let accessToken = get_store(uid, "access_token")
     let sheetId = get_store(uid, "sheet_id")
 
@@ -230,12 +244,15 @@ proc getPlan(uid: string, dt: DateTime): Future[(string, int, string)] {.async.}
 
     # let foundDates = j["values"].getElems().filter(checkFirst)
     if idx == -1:
-        raise newException(ValueError, "No records found in sheet")
+        raise newException(MyError, "No records found in sheet")
     
+    debug "Current day found in plan"
+
     let currentDay = elems[idx][4].getStr
     let text = if elems[idx].len >= 10: elems[idx][9].getStr else: ""
+    let idx2 = idx + 1
 
-    echo "Current plan: ", currentDay, "    row: ", idx+1, "    text: ", text
+    info "Current plan: " & currentDay & "    row: " & $idx2 & "    text: " & text
 
     return (currentDay, idx+1, text)
 
@@ -264,9 +281,9 @@ proc setResult(uid: string, row: int, text, res: string) {.async.} =
     let body = await res.body()
     let j = parseJson(body)
     if j.contains("updatedCells") and j["updatedCells"].getInt == 1:
-        echo "Result updated"
+        info "Result updated"
     else:
-        raise newException(ValueError, "error during cell update")
+        raise newException(MyError, "error during cell update")
     
 proc getActivity(uid: string, dt: DateTime): Future[(string, Table[string, seq[float]])] {.async.} =
     let stravaAccessToken = get_store(uid, "strava_access_token")
@@ -282,17 +299,17 @@ proc getActivity(uid: string, dt: DateTime): Future[(string, Table[string, seq[f
 
     let foundActivities = j.getElems().filter(findToday)
     if foundActivities.len == 0:
-        raise newException(ValueError, "No records found in strava")
+        raise newException(MyError, "No records found in strava")
 
     let currentActivity = foundActivities[0]
 
-    echo "Strava activity name: ", currentActivity["name"]
+    info "Strava activity name: ", currentActivity["name"]
     let id = currentActivity["id"].getBiggestInt
 
     let utc_offset = currentActivity["utc_offset"].getFloat
     upd_store(uid, "utc_offset", $utc_offset)
 
-    echo "get: " & stravaApi & "/activities/" & $id & "?include_all_efforts=false"
+    debug "get: " & stravaApi & "/activities/" & $id & "?include_all_efforts=false"
 
     let res2 = await client.bearerRequest(stravaApi & "/activities/" & $id & "?include_all_efforts=false", stravaAccessToken)
     let body2 = await res2.body()
@@ -305,7 +322,7 @@ proc getActivity(uid: string, dt: DateTime): Future[(string, Table[string, seq[f
     let t = j3.getElems().map(x => (x["type"].getStr, x["data"].getElems().map(y => y.getFloat))).toTable
 
     if t["time"].len != t["watts"].len:
-        raise newException(ValueError, "Streams are not equal len")
+        raise newException(MyError, "Streams are not equal len")
 
     var file = openAsync("2.json", fmWrite)
     await file.write(j3.pretty)
@@ -313,63 +330,51 @@ proc getActivity(uid: string, dt: DateTime): Future[(string, Table[string, seq[f
     
     return (j2["name"].getStr() & " " & $j2["distance"].getFloat() & "m " & j2["type"].getStr(), t)
 
-proc refresh_google(uid: string): Future[string] {.async.} =
-    let exp = get_store(uid, "expiration").parseInt
+proc refresh_token(uid: string, prefix = ""): Future[string] {.async.} =
+    info "Checking token for "& prefix
+    let exp = get_store(uid, prefix & "expiration").parseInt
     if exp < getTime().toUnix():
-        let refreshToken = get_store(uid, "refresh_token")
-        echo "refresh"
+        let refreshToken = get_store(uid, prefix & "refresh_token")
+        info "Trying to refresh"
         let state = generateState()
         let res = await client.refreshToken(accessTokenUrl, clientId, clientSecret, refreshToken, clientScope, useBasicAuth = false);
         let body = await res.body()
         let j = parseJson(body)
 
         if j.contains("access_token") and j.contains("expires_in"):
-            upd_store(uid, "access_token", j["access_token"].getStr)
+            upd_store(uid, prefix & "access_token", j["access_token"].getStr)
             let exp = (getTime() + initDuration(seconds=j["expires_in"].getInt)).toUnix()
-            upd_store(uid, "expiration", $exp)
+            upd_store(uid, prefix & "expiration", $exp)
         else:
-            raise newException(ValueError, "cannot refresh token")
+            raise newException(MyError, "cannot refresh token for " & prefix)
     else:
-        echo "using access"
+        info "Using active token"
 
-    return get_store(uid, "access_token")
-    
-proc refresh_strava(uid: string): Future[string] {.async.} =
-    let exp = get_store(uid, "strava_expiration").parseInt
-    if exp < getTime().toUnix():
-        let refreshToken = get_store(uid, "strava_refresh_token")
-        echo "refresh"
-        let state = generateState()
-        let res = await client.refreshToken(stravaAccessTokenUrl, stravaClientId, stravaClientSecret, refreshToken, stravaClientScope, useBasicAuth = false);
-        let body = await res.body()
-        echo body
-        let j = parseJson(body)
+    return get_store(uid, prefix & "access_token")    
 
-        if j.contains("access_token") and j.contains("expires_in"):
-            upd_store(uid, "strava_access_token", j["access_token"].getStr)
-            let exp = (getTime() + initDuration(seconds=j["expires_in"].getInt)).toUnix()
-            upd_store(uid, "strava_expiration", $exp)
-        else:
-            raise newException(ValueError, "cannot refresh token for strava")
-    else:
-        echo "using access"
+proc process_all*() {.async.} =
+    for (uid, email) in get_uids():
+        await process(uid, email)
 
-    return get_store(uid, "strava_access_token")
-
-proc start*() {.async.} =
-    let uid = "108740387807973236065"
-    let access = await refresh_google(uid)
-    let stravaAccess = await refresh_strava(uid)
+proc process(uid, email: string) {.async.} =
+    info fmt"Processing {uid} ({email})"
+    let access = await refresh_token(uid)
+    let stravaAccess = await refresh_token(uid, "strava_")
     # let today = initDateTime(30, mJan, 2020, 0, 0, 0, utc())
     let today = now() # - initDuration(days = 2)
 
-    let (plan, row, text) = await getPlan(uid, today)
-    let (activity, tw) = await getActivity(uid, today)
+    try:
+        let (plan, row, text) = await getPlan(uid, today)
+        let (activity, tw) = await getActivity(uid, today)
 
-    let pattern = normalize_plan(plan)
-    let res = pattern.process(tw["time"], tw["watts"])
+        let pattern = normalize_plan(plan)
+        let res = pattern.process(tw["time"], tw["watts"])
 
-    let resStr = res.normalize_result()
-    echo "Result: ", resStr
-    await setResult(uid, row, text, resStr)
+        let resStr = res.normalize_result()
+        info "Result: ", resStr
+        await setResult(uid, row, text, resStr)
+    except MyError:
+        warn getCurrentExceptionMsg()
+
+    info "done"
 

@@ -6,6 +6,7 @@ import re
 import strutils
 import math
 import sugar
+import logging
 
 type
     Interval* = tuple
@@ -206,7 +207,7 @@ proc process_old*(pattern: seq[Pattern], time: seq[float], watts: seq[float]): s
     pattern.select_all(best) 
 
 proc process*(pattern: seq[Pattern], time: seq[float], watts: seq[float]): seq[Interval] =
-#   echo "processing: ", pattern
+  debug "processing: " & $pattern
 
 #   echo "time: ", time
 #   echo "watt: ", watts
