@@ -36,7 +36,7 @@ proc normalize_plan*(plan: string): seq[Pattern] =
     for x in plan.findAll(re"\d+x\d+"):
         let vals = x.split('x')
         let pattern: Pattern = (vals[0].parseInt, (60 * vals[1].parseInt).float)
-        result.add(pattern)    
+        result.add(pattern)
 
 proc fmt_duration(x: float): string =
     let x = x.int
@@ -46,10 +46,10 @@ proc fmt_duration(x: float): string =
         result = $(x div 60)
     else:
         result = ($x) & "s"
-    
+
 
 proc normalize_result*(found: seq[Interval]): string =
-    var prev : (int, float, seq[int]) = (0, 0.0, @[])
+    var prev: (int, float, seq[int]) = (0, 0.0, @[])
 
     for x in found:
         if x.duration == prev[1]:
@@ -69,7 +69,8 @@ proc normalize_result*(found: seq[Interval]): string =
         let ints = prev[2].join(" ")
         result &= fmt "{prev[0]}x{prev[1].fmt_duration}({ints})"
 
-proc generate_best*(pattern: seq[Pattern], time: seq[float], watts: seq[float]): seq[seq[Interval]] =
+proc generate_best*(pattern: seq[Pattern], time: seq[float], watts: seq[
+        float]): seq[seq[Interval]] =
     for (repeat, ws) in pattern:
         result.add(@[])
         var acc = 0.0
@@ -95,7 +96,7 @@ proc generate_best*(pattern: seq[Pattern], time: seq[float], watts: seq[float]):
     for x in result.mitems:
         x.sort(cmp2, Ascending)
 
-func overlap*(a,b: Interval): bool =
+func overlap*(a, b: Interval): bool =
     if a.start <= b.start and a.stop > b.start:
         return true
     if b.start <= a.start and b.stop > a.start:
@@ -115,7 +116,7 @@ proc select_top_2*(pattern: seq[Pattern], best: seq[seq[Interval]]): seq[Interva
 
             let work = x.avg*15*60 + y.avg*180
             if work > m:
-                result = @[x,y]
+                result = @[x, y]
                 m = work
 
 proc select_top_3*(pattern: seq[Pattern], best: seq[seq[Interval]]): seq[Interval] =
@@ -131,10 +132,11 @@ proc select_top_3*(pattern: seq[Pattern], best: seq[seq[Interval]]): seq[Interva
             for z in best[1]:
                 if not(y.stop <= z.start):
                     continue
-        
-                let work = x.avg*pattern[0].duration + y.avg*pattern[1].duration + z.avg*pattern[1].duration
+
+                let work = x.avg*pattern[0].duration + y.avg*pattern[
+                        1].duration + z.avg*pattern[1].duration
                 if work > m:
-                    result = @[x,y,z]
+                    result = @[x, y, z]
                     m = work
 
 proc select_all*(pattern: seq[Pattern], best: seq[seq[Interval]]): seq[Interval] =
@@ -145,7 +147,8 @@ proc select_all*(pattern: seq[Pattern], best: seq[seq[Interval]]): seq[Interval]
     var m = 0.0
     var candidate = newSeq[Interval]()
 
-    proc step(left: seq[Interval], acc:float, pattern: seq[Pattern], best: seq[seq[Interval]]) =
+    proc step(left: seq[Interval], acc: float, pattern: seq[Pattern], best: seq[
+            seq[Interval]]) =
         if pattern.len == 0:
             if acc > m:
                 m = acc
@@ -167,8 +170,8 @@ proc select_all*(pattern: seq[Pattern], best: seq[seq[Interval]]): seq[Interval]
 
     step(@[], 0.0, pattern, best)
     return candidate
-    
-proc select_one(last:int, pattern: Pattern, best: seq[Interval]): seq[Interval] =
+
+proc select_one(last: int, pattern: Pattern, best: seq[Interval]): seq[Interval] =
     var best = best
     var repeat = pattern.repeat
 
@@ -200,120 +203,121 @@ proc select_top*(pattern: seq[Pattern], best: seq[seq[Interval]]): seq[Interval]
     elif count == 3:
         return pattern.select_top_3(best)
 
-proc process_old*(pattern: seq[Pattern], time: seq[float], watts: seq[float]): seq[Interval] =
+proc process_old*(pattern: seq[Pattern], time: seq[float], watts: seq[
+        float]): seq[Interval] =
     echo "processing ", pattern
 
     let best = pattern.generate_best(time, watts)
-    pattern.select_all(best) 
+    pattern.select_all(best)
 
 proc process*(pattern: seq[Pattern], time: seq[float], watts: seq[float]): seq[Interval] =
-  debug "processing: " & $pattern
+    debug "processing: " & $pattern
 
 #   echo "time: ", time
 #   echo "watt: ", watts
 
-  var sums = @[0]
-  var current_sum = 0
+    var sums = @[0]
+    var current_sum = 0
 
-  var prev_t = -1.0
-  var prev_val = 0.0
+    var prev_t = -1.0
+    var prev_val = 0.0
 
-  for (t, val) in time.zip(watts):
-    let t_diff = (t-prev_t).int
-    if t_diff > 2:
-        for i in countup(1, t_diff-1):
-            current_sum += 1
+    for (t, val) in time.zip(watts):
+        let t_diff = (t-prev_t).int
+        if t_diff > 2:
+            for i in countup(1, t_diff-1):
+                current_sum += 1
+                sums.add(current_sum)
+        elif t_diff == 2:
+            current_sum += int((prev_val + val) / 2)
             sums.add(current_sum)
-    elif t_diff == 2:
-        current_sum += int((prev_val + val) / 2)
+
+        current_sum += val.int + 1
         sums.add(current_sum)
+        prev_t = t
+        prev_val = val
 
-    current_sum += val.int + 1
-    sums.add(current_sum)
-    prev_t = t
-    prev_val = val
+    let n = sums.len - 1
 
-  let n = sums.len - 1
+    var template_list: seq[int] = @[]
+    for val in pattern:
+        for i in 1..val.repeat:
+            template_list.add(val.duration.int)
 
-  var template_list: seq[int] = @[]
-  for val in pattern:
-    for i in 1..val.repeat:
-      template_list.add(val.duration.int)
+    let m = template_list.len
+    if m == 0:
+        return @[]
 
-  let m = template_list.len
-  if m == 0:
-    return @[]
+    var dyn_arr: seq[seq[int]] = @[]
 
-  var dyn_arr: seq[seq[int]] = @[]
+    var first_arr: seq[int] = @[]
+    let val = template_list[0]
+    for i in 1..n:
+        if i < val:
+            first_arr.add(0)
+            continue
+        first_arr.add(sums[i] - sums[i-val])
 
-  var first_arr: seq[int] = @[]
-  let val = template_list[0]
-  for i in 1..n:
-    if i < val:
-      first_arr.add(0)
-      continue
-    first_arr.add(sums[i] - sums[i-val])
+    dyn_arr.add(first_arr)
 
-  dyn_arr.add(first_arr)
+    for j in 1..<m:
+        let prev_arr: seq[int] = dyn_arr[j-1]
+        var max_in_prev = 0
+        var next_arr: seq[int] = @[]
+        let val = template_list[j]
 
-  for j in 1..<m:
-    let prev_arr: seq[int] = dyn_arr[j-1]
-    var max_in_prev = 0
-    var next_arr: seq[int] = @[]
-    let val = template_list[j]
+        for i in 0..<n:
+            if i + 1 < val:
+                next_arr.add(0)
+                continue
+            let last = sums[i+1] - sums[i+1-val]
+            if max_in_prev > 0:
+                next_arr.add(max_in_prev + last)
+            else:
+                next_arr.add(0)
+            if max_in_prev < prev_arr[i + 1 - val]:
+                max_in_prev = prev_arr[i + 1 - val]
+        dyn_arr.add(next_arr)
 
+    var ret_val = 0
+    var ret_pos = -1
     for i in 0..<n:
-      if i + 1 < val:
-        next_arr.add(0)
-        continue
-      let last = sums[i+1] - sums[i+1-val]
-      if max_in_prev > 0:
-        next_arr.add(max_in_prev + last)
-      else:
-        next_arr.add(0)
-      if max_in_prev < prev_arr[i + 1 - val]:
-        max_in_prev = prev_arr[i + 1 - val]
-    dyn_arr.add(next_arr)
+        let j = dyn_arr[m-1][i]
+        if j > ret_val:
+            ret_val = j
+            ret_pos = i
 
-  var ret_val = 0
-  var ret_pos = -1
-  for i in 0..<n:
-    let j = dyn_arr[m-1][i]
-    if j > ret_val:
-      ret_val = j
-      ret_pos = i
+    if ret_val == 0:
+        return @[]
 
-  if ret_val == 0:
-    return @[]
+    var solution = newSeq[Interval](m)
+    var sum_all = ret_val
+    var pos_y = m - 1
+    var pos_x = ret_pos
 
-  var solution = newSeq[Interval](m)
-  var sum_all = ret_val
-  var pos_y = m - 1
-  var pos_x = ret_pos
+    while pos_y >= 0:
+        if dyn_arr[pos_y][pos_x] == sum_all:
+            let len_val = template_list[pos_y]
+            let sum_val = sums[pos_x+1] - sums[pos_x+1-len_val]
+            let avg = (sum_val - len_val).float / len_val.float
+            let i: Interval = (avg, pos_x+1-len_val, pos_x)
+            solution[pos_y] = i
+            pos_x -= len_val
+            pos_y -= 1
+            sum_all -= sum_val
+        else:
+            pos_x = pos_x - 1
 
-  while pos_y >= 0:
-    if dyn_arr[pos_y][pos_x] == sum_all:
-      let len_val = template_list[pos_y]
-      let sum_val = sums[pos_x+1] - sums[pos_x+1-len_val]
-      let avg = (sum_val - len_val).float / len_val.float
-      let i: Interval = (avg, pos_x+1-len_val, pos_x)
-      solution[pos_y] = i
-      pos_x -= len_val
-      pos_y -= 1
-      sum_all -= sum_val
-    else:
-      pos_x = pos_x - 1
-
-  for j in template_list:
-    ret_val -= j
+    for j in template_list:
+        ret_val -= j
 
 #   echo "solution:   ", solution
 
-  return solution
+    return solution
 
 when isMainModule:
-  let pattern = @[(1,4.0), (2,2.0)]
-  let t = @[0,  1,  2,  3,  4,  5,  6,  7 ].map(x => x.float)
-  let w = @[10, 10, 20, 30, 40, 40, 50, 60].map(x => x.float)
-  echo pattern.process(t, w)
+    let pattern = @[(1, 4.0), (2, 2.0)]
+    let t = @[0, 1, 2, 3, 4, 5, 6, 7].map(x => x.float)
+    let w = @[10, 10, 20, 30, 40, 40, 50, 60].map(x => x.float)
+    echo pattern.process(t, w)
 
