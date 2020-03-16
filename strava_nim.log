@@ -1,1 +1,8 @@
-[00:00:46] - INFO: Browser to the http://host:8080 for registration
+[01:51:20] - INFO: Processing 108740387807973236065 (inv2004@gmail.com)
+[01:51:20] - INFO: Checking token for 
+[01:51:20] - INFO: Trying to refresh
+[01:51:21] - INFO: Checking token for strava_
+[01:51:21] - INFO: Using active token
+[01:51:21] - DEBUG: Requesting current plan
+[01:51:21] - DEBUG: Current day found in plan
+[01:51:21] - INFO: Current plan: 5x5 (300)    row: 2692    text: 
