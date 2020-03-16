@@ -362,7 +362,8 @@ proc process_all*() {.async.} =
         empty = false
         await process(uid, email)
 
-    warn "No records found. Try to run with --reg flag for registration"
+    if empty:
+        warn "No records found. Try to run with --reg flag for registration"
 
 proc process(uid, email: string) {.async.} =
     info fmt"Processing {uid} ({email})"
