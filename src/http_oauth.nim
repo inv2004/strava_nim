@@ -45,6 +45,8 @@ var rollingLog = newRollingFileLogger("strava_nim.log", fmtStr = fmtStr)
 addHandler(consoleLog)
 addHandler(rollingLog)
 
+var server = newAsyncHttpServer()
+
 let client = newAsyncHttpClient()
 
 proc email_test(accessToken: string): Future[(string, string)] {.async.} =
@@ -353,8 +355,12 @@ proc refresh_token(uid: string, prefix = ""): Future[string] {.async.} =
     return get_store(uid, prefix & "access_token")    
 
 proc process_all*() {.async.} =
+    var empty = true
     for (uid, email) in get_uids():
+        empty = false
         await process(uid, email)
+
+    warn "No records found. Try to run with --reg flag for registration"
 
 proc process(uid, email: string) {.async.} =
     info fmt"Processing {uid} ({email})"
@@ -378,3 +384,7 @@ proc process(uid, email: string) {.async.} =
 
     info "done"
 
+proc http*() {.async.} =
+    let port = 8080
+    info fmt"Browser to the http://host:{port} for registration"
+    await server.serve(Port(8080), http_handler)
