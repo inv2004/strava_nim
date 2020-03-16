@@ -10,7 +10,7 @@ The draft version is able to:
 - [x] Download watts stream from strava
 - [x] Find best intervals for the mentioned plan
 - [x] Store result into spreadsheet
-- [x] Process all for all stored users
+- [x] Process for all stored users
 
 ### Build
 ```shell
@@ -22,6 +22,8 @@ nimble -d:ssl -d:release build
 > .\strava_nim.exe --reg
 [01:54:03] - INFO: Browser to the http://localhost:8090 for registration
 ```
+
+testdb.db contains jsons with tokens
 
 ### Normal run
 ```shell
