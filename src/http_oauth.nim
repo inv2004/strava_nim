@@ -11,8 +11,8 @@ import sequtils
 import strutils
 import tables
 import sugar
-import logging
 import strformat
+import logging
 
 import storage
 import times
@@ -39,13 +39,6 @@ const
     stravaAccessTokenUrl = "https://www.strava.com/oauth/token"
     stravaApi = "https://www.strava.com/api/v3"
     stravaPageLimit = 100
-
-let fmtStr = "[$time] - $levelname: "
-var consoleLog = newConsoleLogger(fmtStr = fmtStr)
-var rollingLog = newRollingFileLogger("strava_nim.log", fmtStr = fmtStr)
-
-addHandler(consoleLog)
-addHandler(rollingLog)
 
 var server = newAsyncHttpServer()
 

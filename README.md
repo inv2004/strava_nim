@@ -14,7 +14,7 @@ The draft version is able to:
 
 ### Build
 ```shell
-nimble -d:ssl -d:release build
+nimble.exe -d:ssl -d:release build
 ```
 
 ### First run
