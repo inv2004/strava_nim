@@ -387,5 +387,5 @@ proc process(uid, email: string) {.async.} =
     info "done"
 
 proc http*() {.async.} =
-    info fmt"Browser to the http://host:{httpPort} for registration"
+    info fmt"Browser to the {redirectUri} for registration"
     await server.serve(Port(httpPort), http_handler)
