@@ -25,3 +25,7 @@ proc upd_store*(id: string, key: string, value: string) = # TODO: refactoring
 proc get_store*(id: string, key: string): string =
     let entry = db.queryOne equal("id", id)
     entry[key].getStr
+
+iterator get_uids*(): (string, string) =
+    for x in db:
+        yield (x["id"].getStr, x["email"].getStr)
