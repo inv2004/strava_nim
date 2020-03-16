@@ -26,7 +26,7 @@ const
     httpPort = 8090
     clientId = "438197548914-kp6b5mu5543gdinspvt5tgj0s71q1vbv.apps.googleusercontent.com"
     clientSecret = "F3FV-r9obIVHG3gW6JvDP95m"
-    clientScope = @["https://www.googleapis.com/auth/spreadsheets","email"]
+    clientScope = @["https://www.googleapis.com/auth/spreadsheets", "email"]
     authorizeUrl = "https://accounts.google.com/o/oauth2/v2/auth"
     accessTokenUrl = "https://accounts.google.com/o/oauth2/token"
     redirectUri = "http://" & httpHost & ":" & $httpPort
@@ -55,14 +55,16 @@ proc email_test(accessToken: string): Future[(string, string)] {.async.} =
 
 proc sheet_test(sheetId: string, accessToken: string): Future[string] {.async.} =
     let valueRange = "A1:E10"
-    let res = await client.bearerRequest(sheetApi & "/" & sheetId & "/values/" & valueRange & "?majorDimension=ROWS", accessToken)
+    let res = await client.bearerRequest(sheetApi & "/" & sheetId & "/values/" &
+            valueRange & "?majorDimension=ROWS", accessToken)
     let body = await res.body()
     let j = parseJson(body)
 
     proc to_html(j: JsonNode): string =
-        j.getElems().map(proc (x: JsonNode): string = "<td>"&x.getStr()&"</td>").join()    
+        j.getElems().map(proc (x: JsonNode): string = "<td>"&x.getStr()&"</td>").join()
 
-    return "<table border=2><tr>" & j["values"].getElems().map(to_html).join("</tr><tr>") & "</tr></table>"
+    return "<table border=2><tr>" & j["values"].getElems().map(to_html).join(
+            "</tr><tr>") & "</tr></table>"
 
 proc parseQuery(query: string): TableRef[string, string] =
     let responses = query.split("&")
@@ -101,7 +103,8 @@ proc http_handler*(req: Request) {.async, gcsafe.} =
 
         let msg = """
 <HTML><form action="/check_sheet">spreadsheet id:
-    <input type="text" name="sheet_id" value="""" & sheetId & """" size="60"/>
+    <input type="text" name="sheet_id" value="""" & sheetId &
+                """" size="60"/>
     <input type="hidden" name="code" value="""" & grantResponse.code & """"/>
     <input type="submit" value="check"/>
 </form></HTML>
@@ -117,10 +120,11 @@ proc http_handler*(req: Request) {.async, gcsafe.} =
             redirectUri & "/gcode",
             useBasicAuth = false
         )
-        let body =  await resp.body()
+        let body = await resp.body()
         let j = parseJson(body)
         debug j
-        if j.contains("access_token") and j.contains("refresh_token") and j.contains("expires_in"):
+        if j.contains("access_token") and j.contains("refresh_token") and
+                j.contains("expires_in"):
             let accessToken = j["access_token"].getStr()
 
             let profile = await email_test(accessToken)
@@ -129,7 +133,8 @@ proc http_handler*(req: Request) {.async, gcsafe.} =
 
             store(profile, accessToken)
             upd_store(uid, "refresh_token", j["refresh_token"].getStr)
-            let exp = (getTime() + initDuration(seconds=j["expires_in"].getInt)).toUnix()
+            let exp = (getTime() + initDuration(seconds = j[
+                    "expires_in"].getInt)).toUnix()
             upd_store(uid, "expiration", $exp)
             upd_store(uid, "sheet_id", params["sheet_id"])
 
@@ -168,19 +173,23 @@ proc http_handler*(req: Request) {.async, gcsafe.} =
             redirectUri & "/scode?uid=" & params["uid"],
             useBasicAuth = false
         )
-        let body =  await resp.body()
+        let body = await resp.body()
         let j = parseJson(body)
         debug j
-        if j.contains("access_token") and j.contains("refresh_token") and j.contains("expires_in"):
+        if j.contains("access_token") and j.contains("refresh_token") and
+                j.contains("expires_in"):
             upd_store(uid, "strava_access_token", j["access_token"].getStr)
             upd_store(uid, "strava_refresh_token", j["refresh_token"].getStr)
-            let exp = (getTime() + initDuration(seconds=j["expires_in"].getInt)).toUnix()
+            let exp = (getTime() + initDuration(seconds = j[
+                    "expires_in"].getInt)).toUnix()
             upd_store(uid, "strava_expiration", $exp)
 
             let athlete = j["athlete"]
             let msg = """
 <HTML>
-Ok<br/>Hello """ & athlete["firstname"].getStr() & " " & athlete["lastname"].getStr() & """
+Ok<br/>Hello """ & athlete["firstname"].getStr() & " " & athlete[
+                    "lastname"].getStr() &
+                    """
 <p/>
 <a href="/process?uid=""" & params["uid"] & """">Process The Day</a>
 </HTML>
@@ -194,7 +203,7 @@ Ok<br/>Hello """ & athlete["firstname"].getStr() & " " & athlete["lastname"].get
 
         # let today = now() - initDuration(days = 3)
         let today = initDateTime(30, mJan, 2020, 0, 0, 0, utc())
-        
+
         let (plan, _, _) = await getPlan(uid, today)
         let (activity, tw) = await getActivity(uid, today)
 
@@ -205,9 +214,12 @@ Ok<br/>Hello """ & athlete["firstname"].getStr() & " " & athlete["lastname"].get
 <HTML>
     Example:
     <table border=3>
-        <tr><td>Today:</td><td>""" & today.format("YYYY-MM-dd") & """</td></tr>
-        <tr><td>Plan:</td><td>""" & plan & """</td></tr>
-        <tr><td>Activity:</td><td>""" & activity & """</td></tr>
+        <tr><td>Today:</td><td>""" & today.format("YYYY-MM-dd") &
+                """</td></tr>
+        <tr><td>Plan:</td><td>""" & plan &
+                """</td></tr>
+        <tr><td>Activity:</td><td>""" & activity &
+                """</td></tr>
         <tr><td>Activity:</td><td>""" & $res & """</td></tr>
     </table>
     Your auth is saved and will be processes automatically
@@ -223,7 +235,8 @@ proc getPlan(uid: string, dt: DateTime): Future[(string, int, string)] {.async.}
     let sheetId = get_store(uid, "sheet_id")
 
     let valueRange = "A:J"
-    let res = await client.bearerRequest(sheetApi & "/" & sheetId & "/values/" & valueRange & "?majorDimension=ROWS", accessToken)
+    let res = await client.bearerRequest(sheetApi & "/" & sheetId & "/values/" &
+            valueRange & "?majorDimension=ROWS", accessToken)
     let body = await res.body()
     let j = parseJson(body)
 
@@ -242,7 +255,7 @@ proc getPlan(uid: string, dt: DateTime): Future[(string, int, string)] {.async.}
     # let foundDates = j["values"].getElems().filter(checkFirst)
     if idx == -1:
         raise newException(MyError, "No records found in sheet")
-    
+
     debug "Current day found in plan"
 
     let currentDay = elems[idx][4].getStr
@@ -268,12 +281,14 @@ proc setResult(uid: string, row: int, text, res: string) {.async.} =
     let jReq = %*{
         "range": valueRange,
         "majorDimension": "ROWS",
-        "values": [[ " bot: " & res & old]]
+        "values": [[" bot: " & res & old]]
     }
 
     var headers = newHttpHeaders([("Content-Type", "application/json")])
 
-    let res = await client.bearerRequest(sheetApi & "/" & sheetId & "/values/" & valueRange & "?valueInputOption=RAW", accessToken, httpMethod = HttpPut, body = $jReq, extraHeaders = headers)
+    let res = await client.bearerRequest(sheetApi & "/" & sheetId & "/values/" &
+            valueRange & "?valueInputOption=RAW", accessToken,
+            httpMethod = HttpPut, body = $jReq, extraHeaders = headers)
 
     let body = await res.body()
     let j = parseJson(body)
@@ -281,11 +296,13 @@ proc setResult(uid: string, row: int, text, res: string) {.async.} =
         info "Result updated"
     else:
         raise newException(MyError, "error during cell update")
-    
-proc getActivity(uid: string, dt: DateTime): Future[(string, Table[string, seq[float]])] {.async.} =
+
+proc getActivity(uid: string, dt: DateTime): Future[(string, Table[string, seq[
+        float]])] {.async.} =
     let stravaAccessToken = get_store(uid, "strava_access_token")
 
-    let res = await client.bearerRequest(stravaApi & "/athlete/activities?per_page=" & $stravaPageLimit, stravaAccessToken)
+    let res = await client.bearerRequest(stravaApi &
+            "/athlete/activities?per_page=" & $stravaPageLimit, stravaAccessToken)
     let body = await res.body()
     let j = parseJson(body)
 
@@ -308,15 +325,18 @@ proc getActivity(uid: string, dt: DateTime): Future[(string, Table[string, seq[f
 
     debug "get: " & stravaApi & "/activities/" & $id & "?include_all_efforts=false"
 
-    let res2 = await client.bearerRequest(stravaApi & "/activities/" & $id & "?include_all_efforts=false", stravaAccessToken)
+    let res2 = await client.bearerRequest(stravaApi & "/activities/" & $id &
+            "?include_all_efforts=false", stravaAccessToken)
     let body2 = await res2.body()
     let j2 = parseJson(body2)
 
-    let res3 = await client.bearerRequest(stravaApi & "/activities/" & $id & "/streams/time,watts?resolution=high&series_type=time", stravaAccessToken)
+    let res3 = await client.bearerRequest(stravaApi & "/activities/" & $id &
+            "/streams/time,watts?resolution=high&series_type=time", stravaAccessToken)
     let body3 = await res3.body()
     let j3 = parseJson(body3)
-    
-    let t = j3.getElems().map(x => (x["type"].getStr, x["data"].getElems().map(y => y.getFloat))).toTable
+
+    let t = j3.getElems().map(x => (x["type"].getStr, x["data"].getElems().map(
+            y => y.getFloat))).toTable
 
     if t["time"].len != t["watts"].len:
         raise newException(MyError, "Streams are not equal len")
@@ -324,30 +344,33 @@ proc getActivity(uid: string, dt: DateTime): Future[(string, Table[string, seq[f
     var file = openAsync("2.json", fmWrite)
     await file.write(j3.pretty)
     file.close()
-    
-    return (j2["name"].getStr() & " " & $j2["distance"].getFloat() & "m " & j2["type"].getStr(), t)
+
+    return (j2["name"].getStr() & " " & $j2["distance"].getFloat() & "m " & j2[
+            "type"].getStr(), t)
 
 proc refresh_token(uid: string, prefix = ""): Future[string] {.async.} =
-    info "Checking token for "& prefix
+    info "Checking token for " & prefix
     let exp = get_store(uid, prefix & "expiration").parseInt
     if exp < getTime().toUnix():
         let refreshToken = get_store(uid, prefix & "refresh_token")
         info "Trying to refresh"
         let state = generateState()
-        let res = await client.refreshToken(accessTokenUrl, clientId, clientSecret, refreshToken, clientScope, useBasicAuth = false);
+        let res = await client.refreshToken(accessTokenUrl, clientId,
+                clientSecret, refreshToken, clientScope, useBasicAuth = false);
         let body = await res.body()
         let j = parseJson(body)
 
         if j.contains("access_token") and j.contains("expires_in"):
             upd_store(uid, prefix & "access_token", j["access_token"].getStr)
-            let exp = (getTime() + initDuration(seconds=j["expires_in"].getInt)).toUnix()
+            let exp = (getTime() + initDuration(seconds = j[
+                    "expires_in"].getInt)).toUnix()
             upd_store(uid, prefix & "expiration", $exp)
         else:
             raise newException(MyError, "cannot refresh token for " & prefix)
     else:
         info "Using active token"
 
-    return get_store(uid, prefix & "access_token")    
+    return get_store(uid, prefix & "access_token")
 
 proc process_all*() {.async.} =
     var empty = true

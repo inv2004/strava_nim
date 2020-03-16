@@ -28,14 +28,16 @@ proc main2() {.async.} =
     let body3 = await file.readAll()
     file.close()
     let j3 = parseJson(body3)
-    let t = j3.getElems().map(x => (x["type"].getStr, x["data"].getElems().map(y => y.getFloat))).toTable
+    let t = j3.getElems().map(x => (x["type"].getStr, x["data"].getElems().map(
+            y => y.getFloat))).toTable
     if t["time"].len != t["watts"].len:
         raise newException(ValueError, "Streams are not equal len")
     echo "1x15 (240) + 7x3 (310)".normalize_plan().process(t["time"], t["watts"])
 
 when isMainModule:
     try:
-        let reg = if os.paramCount() >= 1 and os.paramStr(1) == "--reg": true else: false
+        let reg = if os.paramCount() >= 1 and os.paramStr(1) ==
+                "--reg": true else: false
 
         if reg:
             waitFor http()
