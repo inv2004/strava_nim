@@ -10,10 +10,18 @@ import algorithm
 import asyncfile
 import sugar
 import os
+import logging
 
 import analytic
 import storage
 import http_oauth
+
+let fmtStr = "[$date $time] - $levelname: "
+var consoleLog = newConsoleLogger(fmtStr = fmtStr)
+var rollingLog = newRollingFileLogger("strava_nim.log", fmtStr = fmtStr)
+
+addHandler(consoleLog)
+addHandler(rollingLog)
 
 proc main2() {.async.} =
     var file = openAsync("2.json", fmRead)
