@@ -22,12 +22,14 @@ type
     MyError* = object of Exception
 
 const
+    httpHost = "51.15.34.139"
+    httpPort = 8090
     clientId = "438197548914-kp6b5mu5543gdinspvt5tgj0s71q1vbv.apps.googleusercontent.com"
     clientSecret = "F3FV-r9obIVHG3gW6JvDP95m"
     clientScope = @["https://www.googleapis.com/auth/spreadsheets","email"]
     authorizeUrl = "https://accounts.google.com/o/oauth2/v2/auth"
     accessTokenUrl = "https://accounts.google.com/o/oauth2/token"
-    redirectUri = "http://localhost:8080"
+    redirectUri = "http://" & httpHost & ":" & $httpPort
     sheetApi = "https://sheets.googleapis.com/v4/spreadsheets"
     userinfoApi = "https://www.googleapis.com/userinfo/v2/me"
     stravaClientId = "18057"
@@ -385,6 +387,5 @@ proc process(uid, email: string) {.async.} =
     info "done"
 
 proc http*() {.async.} =
-    let port = 8090
-    info fmt"Browser to the http://host:{port} for registration"
-    await server.serve(Port(port), http_handler)
+    info fmt"Browser to the http://host:{httpPort} for registration"
+    await server.serve(Port(httpPort), http_handler)
