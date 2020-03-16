@@ -387,4 +387,4 @@ proc process(uid, email: string) {.async.} =
 proc http*() {.async.} =
     let port = 8090
     info fmt"Browser to the http://host:{port} for registration"
-    await server.serve(Port(8080), http_handler)
+    await server.serve(Port(port), http_handler)
