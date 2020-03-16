@@ -32,8 +32,6 @@ proc main2() {.async.} =
     if t["time"].len != t["watts"].len:
         raise newException(ValueError, "Streams are not equal len")
     echo "1x15 (240) + 7x3 (310)".normalize_plan().process(t["time"], t["watts"])
-    # "1x15 (240)".normalize_plan().process(t["time"], t["watts"])
-    # "7x3 (240)".normalize_plan().process(t["time"], t["watts"])
 
 when isMainModule:
     try:
