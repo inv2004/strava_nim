@@ -43,5 +43,5 @@ when isMainModule:
         else:
             waitFor process_all()
     except:
-        echo "Exception: " & getCurrentExceptionMsg()
+        error "Exception: " & getCurrentExceptionMsg()
 
