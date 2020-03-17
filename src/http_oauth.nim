@@ -366,7 +366,6 @@ proc refresh_token(uid: string, prefix = ""): Future[string] {.async.} =
                 raise newException(ValueError, "invalid prefix")
         let body = await res.body()
         let j = parseJson(body)
-        debug j.pretty
 
         if j.contains("access_token") and j.contains("expires_in"):
             upd_store(uid, prefix & "access_token", j["access_token"].getStr)
