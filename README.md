@@ -27,7 +27,7 @@ testdb.db contains jsons with tokens
 
 ### Normal run
 ```shell
-> .\strave_nim.exe
+> .\strava_nim.exe
 ```
 
 ### Tests
