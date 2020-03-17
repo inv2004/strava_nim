@@ -46,7 +46,6 @@ proc fmt_duration(x: float): string =
     else:
         result = ($x) & "s"
 
-
 proc normalize_result*(found: seq[Interval]): string =
     var prev: (int, float, seq[int]) = (0, 0.0, @[])
 
@@ -59,14 +58,14 @@ proc normalize_result*(found: seq[Interval]): string =
                 if result.len > 0:
                     result &= " + "
                 let ints = prev[2].join(" ")
-                result &= fmt "{prev[0]}x{prev[1].fmt_duration}({ints})"
+                result &= fmt "{prev[0]}x{prev[1].fmt_duration} ({ints})"
             prev = (1, x.duration, @[x.avg.int])
 
     if prev[0] > 0:
         if result.len > 0:
             result &= " + "
         let ints = prev[2].join(" ")
-        result &= fmt "{prev[0]}x{prev[1].fmt_duration}({ints})"
+        result &= fmt "{prev[0]}x{prev[1].fmt_duration} ({ints})"
 
 proc generate_best*(pattern: seq[Pattern], time: seq[float], watts: seq[
         float]): seq[seq[Interval]] =
