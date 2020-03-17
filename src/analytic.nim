@@ -188,9 +188,9 @@ proc process*(pattern: seq[Pattern], time: seq[float], watts: seq[float]): seq[I
             continue
         first_arr.add(sums[i] - sums[i-val])
 
-    #echo "SUMS: ", sums
-    #echo "TMPL: ", template_list
-    #echo "FRST: ", first_arr
+    echo "SUMS: ", sums
+    echo "TMPL: ", template_list
+    echo "FRST: ", first_arr
 
     dyn_arr.add(first_arr)
 

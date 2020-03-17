@@ -77,4 +77,4 @@ test "format_result":
     a.add (avg: 254.9, start: 60*51+36, stop:60*54+35)
     a.add (avg: 224.4, start: 60*57+31, stop:60*60+30)
     let str = a.normalize_result()
-    str.assert_eq "1x20(176) + 7x3(305 306 285 195 241 254 224)"
+    str.assert_eq "1x20 (176) + 7x3 (305 306 285 195 241 254 224)"
