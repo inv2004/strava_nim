@@ -355,10 +355,18 @@ proc refresh_token(uid: string, prefix = ""): Future[string] {.async.} =
         let refreshToken = get_store(uid, prefix & "refresh_token")
         info "Trying to refresh"
         let state = generateState()
-        let res = await client.refreshToken(accessTokenUrl, clientId,
-                clientSecret, refreshToken, clientScope, useBasicAuth = false);
+        let res =
+            if prefix == "":
+                await client.refreshToken(accessTokenUrl, clientId,
+                clientSecret, refreshToken, clientScope, useBasicAuth = false)
+            elif prefix == "strava_":
+                await client.refreshToken(stravaAccessTokenUrl, stravaClientId,
+                stravaClientSecret, refreshToken, stravaClientScope, useBasicAuth = false)
+            else:
+                raise newException(ValueError, "invalid prefix")
         let body = await res.body()
         let j = parseJson(body)
+        debug j.pretty
 
         if j.contains("access_token") and j.contains("expires_in"):
             upd_store(uid, prefix & "access_token", j["access_token"].getStr)
