@@ -78,3 +78,7 @@ test "format_result":
     a.add (avg: 224.4, start: 60*57+31, stop:60*60+30)
     let str = a.normalize_result()
     str.assert_eq "1x20 (176) + 7x3 (305 306 285 195 241 254 224)"
+
+test "format_plan":
+    let res = "1x20(20) + 2x10 (10) + 3x15s(15)+4x15m(15)+4x2h(15)".normalize_plan()
+    res.assert_eq @[(1, 1200.0), (2, 600.0), (3, 15.0), (4, 900.0), (4, 7200.0)]
