@@ -32,9 +32,22 @@ proc `$`*(d: times.Duration): string =
     fmt"{d[Hours]}:{d[Minutes]:02}:{d[Seconds]:02}"
 
 proc normalize_plan*(plan: string): seq[Pattern] =
-    for x in plan.findAll(re"\d+x\d+"):
-        let vals = x.split('x')
-        let pattern: Pattern = (vals[0].parseInt, (60 * vals[1].parseInt).float)
+    for x in plan.findAll(re"\d+x\d+[smh]?"):
+        var str = x
+        let m =
+            if x.endsWith "s":
+                str.removeSuffix "s"
+                1
+            elif x.endsWith "m":
+                str.removeSuffix "m"
+                60
+            elif x.endsWith "h":
+                str.removeSuffix "h"
+                3600
+            else:
+                60
+        let vals = str.split('x')
+        let pattern: Pattern = (vals[0].parseInt, (m * vals[1].parseInt).float)
         result.add(pattern)
 
 proc fmt_duration(x: float): string =
@@ -188,9 +201,10 @@ proc process*(pattern: seq[Pattern], time: seq[float], watts: seq[float]): seq[I
             continue
         first_arr.add(sums[i] - sums[i-val])
 
-    echo "SUMS: ", sums
-    echo "TMPL: ", template_list
-    echo "FRST: ", first_arr
+    # echo "WATT: ", watts.mapIt(it.int)
+    # echo "SUMS: ", sums
+    # echo "TMPL: ", template_list
+    # echo "FRST: ", first_arr
 
     dyn_arr.add(first_arr)
 
@@ -200,18 +214,20 @@ proc process*(pattern: seq[Pattern], time: seq[float], watts: seq[float]): seq[I
         var next_arr: seq[int] = @[]
         let val = template_list[j]
 
-        for i in 0..<n:
-            if i + 1 < val:
+        for i in 1..n:
+            if i < val:
                 next_arr.add(0)
                 continue
-            let last = sums[i+1] - sums[i+1-val]
+            let last = sums[i] - sums[i-val]
             if max_in_prev > 0:
                 next_arr.add(max_in_prev + last)
             else:
                 next_arr.add(0)
-            if max_in_prev < prev_arr[i + 1 - val]:
-                max_in_prev = prev_arr[i + 1 - val]
+            if max_in_prev < prev_arr[i - val]:
+                max_in_prev = prev_arr[i - val]
         dyn_arr.add(next_arr)
+
+    # for x in dyn_arr: echo "DYNN: ", x
 
     var ret_val = 0
     var ret_pos = -1
