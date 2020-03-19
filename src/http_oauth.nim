@@ -266,9 +266,14 @@ proc getPlan(uid: string, dt: DateTime): Future[(string, int, string)] {.async.}
 
     return (currentDay, idx+1, text)
 
-proc setResult(uid: string, row: int, text, res: string) {.async.} =
+proc setResult(uid: string, row: int, oldText, res: string) {.async.} =
 
     if res.len == 0:
+        return
+
+    let newText = "bot: " & res
+
+    if newText == oldText:
         return
 
     let accessToken = get_store(uid, "access_token")
@@ -276,12 +281,12 @@ proc setResult(uid: string, row: int, text, res: string) {.async.} =
 
     let valueRange = "J" & $row
 
-    let old = if text.len > 0: "\n  old: " & text else: ""
+    let old = if oldText.len > 0: "\n  old: " & oldText else: ""
 
     let jReq = %*{
         "range": valueRange,
         "majorDimension": "ROWS",
-        "values": [[" bot: " & res & old]]
+        "values": [[ newText & old ]]
     }
 
     var headers = newHttpHeaders([("Content-Type", "application/json")])
