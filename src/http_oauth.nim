@@ -298,7 +298,7 @@ proc setResult(uid: string, row: int, oldText, res: string) {.async.} =
     let body = await res.body()
     let j = parseJson(body)
     if j.contains("updatedCells") and j["updatedCells"].getInt == 1:
-        info "Result updated"
+        info "Spreadsheet updated"
     else:
         raise newException(MyError, "error during cell update")
 
@@ -322,7 +322,7 @@ proc getActivity(uid: string, dt: DateTime): Future[(string, Table[string, seq[
 
     let currentActivity = foundActivities[0]
 
-    info "Strava activity name: ", currentActivity["name"]
+    info "Strava activity name: ", currentActivity["name"].getStr
     let id = currentActivity["id"].getBiggestInt
 
     let utc_offset = currentActivity["utc_offset"].getFloat
