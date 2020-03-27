@@ -257,7 +257,7 @@ proc process*(pattern: seq[Pattern], time: seq[float], watts: seq[float]): (int,
     for j in template_list:
         ret_val -= j
 
-    trace "SOLU:   ", solution.mapIt(it[2])
+    trace "SOLU: ", solution.mapIt(it[2])
 
     return (ret_val, solution)
 
