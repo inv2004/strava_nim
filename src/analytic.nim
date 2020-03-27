@@ -17,6 +17,9 @@ type
         repeat: int
         duration: float
 
+template trace(args: varargs[string, `$`]): untyped =
+    when not defined(release):
+        echo args.join()
 
 func duration(a: Interval): float =
     (a.stop - a.start + 1).float
@@ -153,81 +156,74 @@ proc process_old*(pattern: seq[Pattern], time: seq[float], watts: seq[
     let best = pattern.generate_best(time, watts)
     pattern.select_all(best)
 
-proc process*(pattern: seq[Pattern], time: seq[float], watts: seq[float]): seq[Interval] =
-    debug "processing: " & $pattern
+proc movingSum(time, watts: seq[float]): seq[int] =
+    result.add(0)
+    var current_sum = 0
+    var prev = (-1.0, 0.0)
+
+    for (t, val) in time.zip(watts):
+        let t_diff = (t-prev[0]).int
+        if t_diff > 2:
+            for i in 0..t_diff-2:
+                current_sum += 1
+                result.add(current_sum)
+        elif t_diff == 2:
+            current_sum += int((prev[1] + val) / 2)
+            result.add(current_sum)
+
+        current_sum += val.int + 1
+        result.add(current_sum)
+        prev = (t, val)
+
+    result.mapIt(it.int)
+
+proc expandTemplate(pattern: seq[Pattern]): seq[int] =
+    for val in pattern:
+        for i in 1..val.repeat:
+            result.add(val.duration.int)
+
+
+proc process*(pattern: seq[Pattern], time: seq[float], watts: seq[float]): (int, seq[Interval]) =
+    trace "processing: " & $pattern
 
 #   echo "time: ", time
 #   echo "watt: ", watts
 
-    var sums = @[0]
-    var current_sum = 0
-
-    var prev_t = -1.0
-    var prev_val = 0.0
-
-    for (t, val) in time.zip(watts):
-        let t_diff = (t-prev_t).int
-        if t_diff > 2:
-            for i in countup(1, t_diff-1):
-                current_sum += 1
-                sums.add(current_sum)
-        elif t_diff == 2:
-            current_sum += int((prev_val + val) / 2)
-            sums.add(current_sum)
-
-        current_sum += val.int + 1
-        sums.add(current_sum)
-        prev_t = t
-        prev_val = val
-
+    let sums = movingSum(time, watts)
     let n = sums.len - 1
 
-    var template_list: seq[int] = @[]
-    for val in pattern:
-        for i in 1..val.repeat:
-            template_list.add(val.duration.int)
-
+    let template_list = expandTemplate(pattern)
     let m = template_list.len
     if m == 0:
-        return @[]
+        return (0, @[])
 
     var dyn_arr: seq[seq[int]] = @[]
 
-    var first_arr: seq[int] = @[]
-    let val = template_list[0]
-    for i in 1..n:
-        if i < val:
-            first_arr.add(0)
-            continue
-        first_arr.add(sums[i] - sums[i-val])
-
-    # echo "WATT: ", watts.mapIt(it.int)
-    # echo "SUMS: ", sums
-    # echo "TMPL: ", template_list
-    # echo "FRST: ", first_arr
-
-    dyn_arr.add(first_arr)
-
-    for j in 1..<m:
-        let prev_arr: seq[int] = dyn_arr[j-1]
-        var max_in_prev = 0
+    for j, val in template_list:
         var next_arr: seq[int] = @[]
-        let val = template_list[j]
+        var max_in_prev = 0
 
         for i in 1..n:
             if i < val:
                 next_arr.add(0)
                 continue
-            let last = sums[i] - sums[i-val]
-            if max_in_prev > 0:
+            if max_in_prev > 0 or j == 0:
+                let last = sums[i] - sums[i-val]
                 next_arr.add(max_in_prev + last)
             else:
                 next_arr.add(0)
-            if max_in_prev < prev_arr[i - val]:
-                max_in_prev = prev_arr[i - val]
+            if j > 0:
+                let prev_arr = dyn_arr[j-1]
+                if max_in_prev < prev_arr[i - val]:
+                    max_in_prev = prev_arr[i - val]
+
         dyn_arr.add(next_arr)
 
-    # for x in dyn_arr: echo "DYNN: ", x
+    trace "TIME: ", time
+    trace "WATT: ", watts.mapIt(it.int)
+    trace "SUMS: ", sums
+    trace "TMPL: ", template_list
+    for x in dyn_arr: trace "DYNN: @[", x.mapIt(fmt"{it:3}").join(", "), "]"
 
     var ret_val = 0
     var ret_pos = -1
@@ -238,7 +234,7 @@ proc process*(pattern: seq[Pattern], time: seq[float], watts: seq[float]): seq[I
             ret_pos = i
 
     if ret_val == 0:
-        return @[]
+        return (0, @[])
 
     var solution = newSeq[Interval](m)
     var sum_all = ret_val
@@ -261,9 +257,9 @@ proc process*(pattern: seq[Pattern], time: seq[float], watts: seq[float]): seq[I
     for j in template_list:
         ret_val -= j
 
-#   echo "solution:   ", solution
+    trace "SOLU:   ", solution.mapIt(it[2])
 
-    return solution
+    return (ret_val, solution)
 
 when isMainModule:
     let pattern = @[(1, 4.0), (2, 2.0)]
