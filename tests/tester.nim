@@ -11,32 +11,32 @@ template assert_eq[T](a: T, b: T) =
 test "one":
     let t = @[0,  1,  2,  3,  4,  5 ].map(x => x.float)
     let w = @[10, 10, 20, 30, 40, 40].map(x => x.float)
-    let res = @[(1,4.0)].process(t, w)
+    let (_, res) = @[(1,4.0)].process(t, w)
     res.assert_eq @[(32.5, 2, 5)]
 
 test "two":
     let t = @[0,  1,  2,  3,  4,  5 ].map(x => x.float)
     let w = @[10, 10, 20, 30, 40, 40].map(x => x.float)
-    let res = @[(2,2.0)].process(t, w)
+    let (_, res) = @[(2,2.0)].process(t, w)
     res.assert_eq @[(25.0, 2, 3), (40.0, 4, 5)]
 
 test "simple":
     let t = @[0,   1,  2,  3,  4, 5].map(x => x.float)
     let w = @[10, 20, 30, 20, 10, 5].map(x => x.float)
-    let res = @[(1,2.0), (1,3.0)].process(t, w)
+    let (_, res) = @[(1,2.0), (1,3.0)].process(t, w)
     res.assert_eq @[(15.0, 0, 1), (20.0, 2, 4)]
 
 test "skip_time":
     let t = @[0,   1,  3,  4, 5].map(x => x.float)
     let w = @[10, 20, 20, 10, 5].map(x => x.float)
-    var res = @[(1,2.0), (1,3.0)].process(t, w)
+    var (_, res) = @[(1,2.0), (1,3.0)].process(t, w)
     res[1][0] = res[1][0].floor
     res.assert_eq @[(15.0, 0, 1), (16.0, 2, 4)]
 
 test "skip_time_2":
     let t = @[0,   1,  4,  4, 5].map(x => x.float)
     let w = @[10, 20, 20, 10, 5].map(x => x.float)
-    var res = @[(1,2.0), (1,3.0)].process(t, w)
+    var (_, res) = @[(1,2.0), (1,3.0)].process(t, w)
     res[1][0] = res[1][0].floor
     res.assert_eq @[(15.0, 0, 1), (11.0, 4, 6)]
 
@@ -50,19 +50,19 @@ test "overlap":
 test "find_best":
     let t = @[0,  1,  2,  3,  4,  5,  6,  7 ].map(x => x.float)
     let w = @[10, 10, 20, 30, 40, 40, 50, 50].map(x => x.float)
-    let res = @[(1,4.0), (2,2.0)].process(t, w)
+    let (_, res) = @[(1,4.0), (2,2.0)].process(t, w)
     res.assert_eq @[(17.5, 0, 3), (40.0, 4, 5), (50.0, 6, 7)]
 
 test "find_best_2":
     let t = @[0,  1,  2,  3,  4,  5,  6,  7 ].map(x => x.float)
     let w = @[10, 10, 20, 30, 40, 40, 40, 40].map(x => x.float)
-    let res = @[(1,4.0), (2,2.0)].process(t, w)
+    let (_, res) = @[(1,4.0), (2,2.0)].process(t, w)
     res.assert_eq @[(17.5, 0, 3), (40.0, 4, 5), (40.0, 6, 7)]
 
 test "find_best_fail":
     let t = @[0,  1,  2,  3,  4,  5,  6,  7 ].map(x => x.float)
     let w = @[10, 10, 20, 30, 40, 40, 50, 50].map(x => x.float)
-    let res = @[(1,4.0), (1,2.0), (1,3.0)].process(t, w)
+    let (_, res) = @[(1,4.0), (1,2.0), (1,3.0)].process(t, w)
     let empty: seq[Interval] = @[]
     res.assert_eq empty
 

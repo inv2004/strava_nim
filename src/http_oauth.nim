@@ -405,7 +405,7 @@ proc process(uid, email: string) {.async.} =
         let (activity, tw) = await getActivity(uid, today)
 
         let pattern = normalize_plan(plan)
-        let res = pattern.process(tw["time"], tw["watts"])
+        let (_, res) = pattern.process(tw["time"], tw["watts"])
 
         let resStr = res.normalize_result()
         info "Result: ", resStr
