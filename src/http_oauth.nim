@@ -401,8 +401,8 @@ proc process(uid, email: string) {.async.} =
     info fmt"Processing {uid} ({email})"
     let access = await refresh_token(uid)
     let stravaAccess = await refresh_token(uid, "strava_")
-    # let today = now() # - initDuration(days = 2)
-    let today = initDateTime(01, mApr, 2020, 0, 0, 0, utc())
+    let today = now() # - initDuration(days = 2)
+    # let today = initDateTime(01, mApr, 2020, 0, 0, 0, utc())
 
     try:
         let (plan, row, text) = await getPlan(uid, today)
