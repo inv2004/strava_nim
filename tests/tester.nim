@@ -59,11 +59,19 @@ test "find_best_2":
     let (_, res) = @[(1,4.0), (2,2.0)].process(t, w)
     res.assert_eq @[(17.5, 0, 3), (40.0, 4, 5), (40.0, 6, 7)]
 
-test "find_best_fail":
+test "find_best_partial":
     let t = @[0,  1,  2,  3,  4,  5,  6,  7 ].map(x => x.float)
     let w = @[10, 10, 20, 30, 40, 40, 50, 50].map(x => x.float)
     let (_, res) = @[(1,4.0), (1,2.0), (1,3.0)].process(t, w)
     res.assert_eq @[(32.5, 2, 5), (50.0, 6, 7)]
+
+test "find_best_fail":
+    let t = @[0,  1,  2].map(x => x.float)
+    let w = @[10, 10, 20].map(x => x.float)
+    let (_, res) = @[(1,4.0), (1,2.0)].process(t, w)
+    let empty: seq[Interval] = @[]
+    res.assert_eq empty
+
 
 test "format_result":
     var a: seq[Interval] = @[]
