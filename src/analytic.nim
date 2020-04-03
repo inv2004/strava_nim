@@ -227,18 +227,21 @@ proc process*(pattern: seq[Pattern], time: seq[float], watts: seq[float]): (int,
 
     var ret_val = 0
     var ret_pos = -1
-    for i in 0..<n:
-        let j = dyn_arr[m-1][i]
-        if j > ret_val:
-            ret_val = j
-            ret_pos = i
+    var ret_pos_y = -1
+    for jj in countdown(m-1, 0):
+        for i in 0..<n:
+            let j = dyn_arr[jj][i]
+            if j > ret_val:
+                ret_val = j
+                ret_pos = i
+                ret_pos_y = jj
 
     if ret_val == 0:
         return (0, @[])
 
-    var solution = newSeq[Interval](m)
+    var solution = newSeq[Interval](ret_pos_y + 1)
     var sum_all = ret_val
-    var pos_y = m - 1
+    var pos_y = ret_pos_y
     var pos_x = ret_pos
 
     while pos_y >= 0:
