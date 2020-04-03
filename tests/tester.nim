@@ -72,7 +72,6 @@ test "find_best_fail":
     let empty: seq[Interval] = @[]
     res.assert_eq empty
 
-
 test "format_result":
     var a: seq[Interval] = @[]
     a.add (avg: 176.7, start: 60*00+41, stop:60*20+40)
