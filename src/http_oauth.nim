@@ -266,16 +266,20 @@ proc getPlan(uid: string, dt: DateTime): Future[(string, int, string)] {.async.}
 
     return (currentDay, idx+1, text)
 
-proc setResult(uid: string, row: int, oldText, res: string) {.async.} =
+proc setResult(uid: string, row: int, oldText, res, activity: string) {.async.} =
 
     if res.len == 0:
         return
 
-    let newText = "bot: " & res
+    let zrPref =
+        if activity.toLowerAscii().find("race") >= 0: "ZR or "
+        else: ""
+
+    let newText = "bot: " & zrPref & res
 
     if newText == oldText:
         return
-
+    
     let accessToken = get_store(uid, "access_token")
     let sheetId = get_store(uid, "sheet_id")
 
@@ -397,8 +401,8 @@ proc process(uid, email: string) {.async.} =
     info fmt"Processing {uid} ({email})"
     let access = await refresh_token(uid)
     let stravaAccess = await refresh_token(uid, "strava_")
-    # let today = initDateTime(30, mJan, 2020, 0, 0, 0, utc())
-    let today = now() # - initDuration(days = 2)
+    # let today = now() # - initDuration(days = 2)
+    let today = initDateTime(01, mApr, 2020, 0, 0, 0, utc())
 
     try:
         let (plan, row, text) = await getPlan(uid, today)
@@ -409,7 +413,7 @@ proc process(uid, email: string) {.async.} =
 
         let resStr = res.normalize_result()
         info "Result: ", resStr
-        await setResult(uid, row, text, resStr)
+        await setResult(uid, row, text, resStr, activity)
     except MyError:
         warn getCurrentExceptionMsg()
 
