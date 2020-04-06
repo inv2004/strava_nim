@@ -388,20 +388,22 @@ proc refresh_token(uid: string, prefix = ""): Future[string] {.async.} =
 
     return get_store(uid, prefix & "access_token")
 
-proc process_all*() {.async.} =
+proc process_all*(testRun: bool, daysOffset: int) {.async.} =
     var empty = true
+    let today = now() - initDuration(days = daysOffset)
     for (uid, email) in get_uids():
         empty = false
-        await process(uid, email)
+        await process(testRun, today, uid, email)
 
     if empty:
         warn "No records found. Try to run with --reg flag for registration"
 
-proc process(uid, email: string) {.async.} =
-    info fmt"Processing {uid} ({email})"
+proc process(testRun: bool, today: DateTime, uid, email: string) {.async.} =
+    let fmt = "yyyy-MM-dd"
+    let test = if testRun:"testRun" else:""
+    info fmt"Processing {uid} ({email}) for {today.format(fmt)} {test}"
     let access = await refresh_token(uid)
     let stravaAccess = await refresh_token(uid, "strava_")
-    let today = now() # - initDuration(days = 2)
     # let today = initDateTime(01, mApr, 2020, 0, 0, 0, utc())
 
     try:
@@ -413,7 +415,8 @@ proc process(uid, email: string) {.async.} =
 
         let resStr = res.normalize_result()
         info "Result: ", resStr
-        await setResult(uid, row, text, resStr, activity)
+        if not testRun:
+            await setResult(uid, row, text, resStr, activity)
     except MyError:
         warn getCurrentExceptionMsg()
 
