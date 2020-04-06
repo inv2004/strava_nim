@@ -5,11 +5,14 @@ import sequtils
 import json
 import times
 import strformat
+import strutils
 import algorithm
 import asyncfile
 import sugar
 import os
 import logging
+import parseopt
+import re
 
 import analytic
 import storage
@@ -35,13 +38,23 @@ proc main2() {.async.} =
 
 when isMainModule:
     try:
-        let reg = if os.paramCount() >= 1 and os.paramStr(1) ==
-                "--reg": true else: false
+        var http = false
+        var daysOffset = 0
+        var testRun = false
 
-        if reg:
+        for kind, key, val in getopt():
+            echo kind, " - ", key, " - ", val
+            if key == "reg":
+                http = true
+            elif key.match(re"^\d+d$"):
+                daysOffset = parseInt(key[0..^2])
+            elif key == "test":
+                testRun = true
+            
+        if http:
             waitFor http()
         else:
-            waitFor process_all()
+            waitFor process_all(testRun, daysOffset)
     except:
         error "Exception: " & getCurrentExceptionMsg()
 
