@@ -107,12 +107,12 @@ proc http_handler*(req: Request) {.async, gcsafe.} =
         let msg = """
 <HTML><form action="/check_sheet">spreadsheet id:
     <input type="text" name="sheet_id" value="""" & sheetId &
-                """" size="60"/>
-    <p>
+                """" size="60"/><br>
+    <input type="submit" value="check"/>
+    <p/>
     How to find it:<br>
     <a href="https://ibb.co/4FdtGY2"><img src="https://i.ibb.co/51F4ynk/id.png" alt="id" border="0"></a>
     <input type="hidden" name="code" value="""" & grantResponse.code & """"/>
-    <input type="submit" value="check"/>
 </form></HTML>
 """
         await req.respond(Http200, msg, headers)
