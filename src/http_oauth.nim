@@ -153,24 +153,24 @@ proc http_handler*(req: Request) {.async, gcsafe.} =
         let msg = """
 <HTML>Ok:<br/>""" & res2 & """
 <p/>
-<a href="/sauth?uid=""" & uid & """">Strava Auth</a>
+<a href="/strava?uid=""" & uid & """">Strava Auth</a>
 </HTML>
 """
         await req.respond(Http200, msg, headers)
-    elif req.url.path == "/sauth":
+    elif req.url.path == "/strava":
         let params = req.url.query.parseQuery()
         let state = generateState()
         let grantUrl = getAuthorizationCodeGrantUrl(
             stravaAuthorizeUrl,
             stravaClientId,
-            redirectUri & "/scode?uid=" & params["uid"],
+            redirectUri & "/sauth?uid=" & params["uid"],
             state,
             stravaClientScope,
             accessType = "offline"
         )
         headers["Location"] = grantUrl
         await req.respond(Http301, "", headers)
-    elif req.url.path == "/scode":
+    elif req.url.path == "/sauth":
         let params = req.url.query.parseQuery()
         let uid = params["uid"]
         # echo $params
@@ -179,7 +179,7 @@ proc http_handler*(req: Request) {.async, gcsafe.} =
             params["code"],
             stravaClientId,
             stravaClientSecret,
-            redirectUri & "/scode?uid=" & params["uid"],
+            redirectUri & "/sauth?uid=" & params["uid"],
             useBasicAuth = false
         )
         let body = await resp.body()
