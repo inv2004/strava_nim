@@ -101,12 +101,16 @@ proc http_handler*(req: Request) {.async, gcsafe.} =
 
         # echo "Code is " & grantResponse.code
 
-        let sheetId = "1oo_BljdsPXQC296TXY9h_vYgkrRhWQDul16yk0-6qGI"
+        #let sheetId = "1oo_BljdsPXQC296TXY9h_vYgkrRhWQDul16yk0-6qGI"
+        let sheetId = ""
 
         let msg = """
 <HTML><form action="/check_sheet">spreadsheet id:
     <input type="text" name="sheet_id" value="""" & sheetId &
                 """" size="60"/>
+    <p>
+    How to find it:<br>
+    <a href="https://ibb.co/4FdtGY2"><img src="https://i.ibb.co/51F4ynk/id.png" alt="id" border="0"></a>
     <input type="hidden" name="code" value="""" & grantResponse.code & """"/>
     <input type="submit" value="check"/>
 </form></HTML>
