@@ -229,7 +229,7 @@ Ok<br/>Hello """ & athlete["firstname"].getStr() & " " & athlete[
                 """</td></tr>
         <tr><td>Activity:</td><td>""" & activity &
                 """</td></tr>
-        <tr><td>Activity:</td><td>""" & $res & """</td></tr>
+        <tr><td>Result:</td><td>""" & $res[1] & """</td></tr>
     </table>
     Your auth is saved and will be processes automatically
 </HTML>
