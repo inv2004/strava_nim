@@ -128,19 +128,29 @@ proc http_handler*(req: Request) {.async, gcsafe.} =
         if not j.contains("access_token"): raise newException(MyError, "No access_token found from google")
         if not j.contains("expires_in"): raise newException(MyError, "No expires_in found from google")
 
-        if not j.contains("refresh_token"):
-            await req.respond(Http200, """
-<HTML>No refresh_token found in google response.<br>
-    Please remove strava-nim permissions from <a href="https://myaccount.google.com/u/0/permissions">https://myaccount.google.com/u/0/permissions</a><br>
-    and then try again: <a href="/">Restart</a></HTML>
-""", headers)
-            return
-
         let accessToken = j["access_token"].getStr()
 
         let profile = await email_test(accessToken)
         let uid = profile[0]
             # let email = profile[1]
+
+        if not j.contains("refresh_token"):
+            try:
+                let rt = get_store(uid, "refresh_token")
+                await req.respond(Http200, """
+<HTML>No refresh_token found in google response.<br>
+    But we have stored one. Looks like you are already registered.
+    <p/>
+    If you want, please continue to strava authorization <a href="/strava?uid=""" & uid & """">Strava Auth</a><br>
+""", headers)
+                return
+            except:
+                await req.respond(Http200, """
+<HTML>No refresh_token found in google response<br>
+    Please remove strava-nim permissions from <a href="https://myaccount.google.com/u/0/permissions">https://myaccount.google.com/u/0/permissions</a><br>
+    and then try again: <a href="/">Restart</a></HTML>
+""", headers)
+                return
 
         store(profile, accessToken)
         upd_store(uid, "refresh_token", j["refresh_token"].getStr)
