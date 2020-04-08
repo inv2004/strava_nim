@@ -125,6 +125,15 @@ proc http_handler*(req: Request) {.async, gcsafe.} =
         let body = await resp.body()
         let j = parseJson(body)
         debug j
+
+        if j.contains("error"):
+            await req.respond(Http200, """
+<HTML>There is an error from google OAuth.<br>
+    <p/>
+    Please try again <a href="/">Restart</a><br>
+""", headers)
+            return
+
         if not j.contains("access_token"): raise newException(MyError, "No access_token found from google")
         if not j.contains("expires_in"): raise newException(MyError, "No expires_in found from google")
 
@@ -210,7 +219,7 @@ Ok<br/>Hello """ & athlete["firstname"].getStr() & " " & athlete[
                     "lastname"].getStr() &
                     """
 <p/>
-<a href="/process?uid=""" & params["uid"] & """">Process The Day just to check that it works (no data will be updated)</a>
+<a href="/process?uid=""" & params["uid"] & """">Process The Day</a> just to check that it works (no data will be updated)
 </HTML>
 """
             await req.respond(Http200, msg, headers)
