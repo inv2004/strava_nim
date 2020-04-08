@@ -24,8 +24,10 @@ type
 const
     httpHost = "strava-nim.tradesim.org"
     httpPort = 8090
-    clientId = "438197548914-kp6b5mu5543gdinspvt5tgj0s71q1vbv.apps.googleusercontent.com"
-    clientSecret = "F3FV-r9obIVHG3gW6JvDP95m"
+    #clientId = "438197548914-kp6b5mu5543gdinspvt5tgj0s71q1vbv.apps.googleusercontent.com"
+    clientId = "438197548914-rd4afdt82qk0hd9qntp8bg2cd1pprp5v.apps.googleusercontent.com"
+    #clientSecret = "F3FV-r9obIVHG3gW6JvDP95m"
+    clientSecret = "cGtgJ69WgFJejypLUzxCoTFA"
     clientScope = @["https://www.googleapis.com/auth/spreadsheets", "email"]
     authorizeUrl = "https://accounts.google.com/o/oauth2/v2/auth"
     accessTokenUrl = "https://accounts.google.com/o/oauth2/token"
