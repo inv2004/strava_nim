@@ -62,7 +62,7 @@ proc fmt_duration(x: float): string =
     else:
         result = ($x) & "s"
 
-proc normalize_result*(found: seq[Interval]): string =
+proc `$`*(found: seq[Interval]): string =
     var prev: (int, float, seq[int]) = (0, 0.0, @[])
 
     for x in found:

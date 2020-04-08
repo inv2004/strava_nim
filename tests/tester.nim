@@ -82,7 +82,7 @@ test "format_result":
     a.add (avg: 241.2, start: 60*45+28, stop:60*48+27)
     a.add (avg: 254.9, start: 60*51+36, stop:60*54+35)
     a.add (avg: 224.4, start: 60*57+31, stop:60*60+30)
-    let str = a.normalize_result()
+    let str = $a
     str.assert_eq "1x20 (176) + 7x3 (305 306 285 195 241 254 224)"
 
 test "format_plan":
