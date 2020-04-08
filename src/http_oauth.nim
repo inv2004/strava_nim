@@ -131,8 +131,8 @@ proc http_handler*(req: Request) {.async, gcsafe.} =
         if not j.contains("refresh_token"):
             await req.respond(Http200, """
 <HTML>No refresh_token found in google response.<br>
-    Please remove strava-nim permissions from <a href="https://myaccount.google.com/u/0/permissions">https://myaccount.google.com/u/0/permissions</a>
-    And try again: <a href="/">Restart</a></HTML>
+    Please remove strava-nim permissions from <a href="https://myaccount.google.com/u/0/permissions">https://myaccount.google.com/u/0/permissions</a><br>
+    and then try again: <a href="/">Restart</a></HTML>
 """, headers)
             return
 
