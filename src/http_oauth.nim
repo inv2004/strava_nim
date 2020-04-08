@@ -200,7 +200,7 @@ Ok<br/>Hello """ & athlete["firstname"].getStr() & " " & athlete[
                     "lastname"].getStr() &
                     """
 <p/>
-<a href="/process?uid=""" & params["uid"] & """">Process The Day</a>
+<a href="/process?uid=""" & params["uid"] & """">Process The Day just to check that it works (no data will be updated)</a>
 </HTML>
 """
             await req.respond(Http200, msg, headers)
@@ -422,7 +422,7 @@ proc process(testRun: bool, today: DateTime, uid, email: string) {.async.} =
         let pattern = normalize_plan(plan)
         let (_, res) = pattern.process(tw["time"], tw["watts"])
 
-        let resStr = res.normalize_result()
+        let resStr = $res
         info "Result: ", resStr
         if not testRun:
             await setResult(uid, row, text, resStr, activity)
