@@ -123,31 +123,38 @@ proc http_handler*(req: Request) {.async, gcsafe.} =
         let body = await resp.body()
         let j = parseJson(body)
         debug j
-        if j.contains("access_token") and j.contains("refresh_token") and
-                j.contains("expires_in"):
-            let accessToken = j["access_token"].getStr()
+        if not j.contains("access_token"): raise newException(MyError, "No access_token found from google")
+        if not j.contains("expires_in"): raise newException(MyError, "No expires_in found from google")
 
-            let profile = await email_test(accessToken)
-            let uid = profile[0]
+        if not j.contains("refresh_token"):
+            await req.respond(Http200, """
+<HTML>No refresh_token found in google response.<br>
+    Please remove strava-nim permissions from <a href="https://myaccount.google.com/u/0/permissions">https://myaccount.google.com/u/0/permissions</a>
+    And try again: <a href="/">Restart</a></HTML>
+""", headers)
+            return
+
+        let accessToken = j["access_token"].getStr()
+
+        let profile = await email_test(accessToken)
+        let uid = profile[0]
             # let email = profile[1]
 
-            store(profile, accessToken)
-            upd_store(uid, "refresh_token", j["refresh_token"].getStr)
-            let exp = (getTime() + initDuration(seconds = j[
-                    "expires_in"].getInt)).toUnix()
-            upd_store(uid, "expiration", $exp)
-            upd_store(uid, "sheet_id", params["sheet_id"])
+        store(profile, accessToken)
+        upd_store(uid, "refresh_token", j["refresh_token"].getStr)
+        let exp = (getTime() + initDuration(seconds = j[
+                "expires_in"].getInt)).toUnix()
+        upd_store(uid, "expiration", $exp)
+        upd_store(uid, "sheet_id", params["sheet_id"])
 
-            let res2 = await sheet_test(params["sheet_id"], accessToken)
-            let msg = """
+        let res2 = await sheet_test(params["sheet_id"], accessToken)
+        let msg = """
 <HTML>Ok:<br/>""" & res2 & """
 <p/>
 <a href="/sauth?uid=""" & uid & """">Strava Auth</a>
 </HTML>
 """
-            await req.respond(Http200, msg, headers)
-        else:
-            await req.respond(Http200, "<HTML>Error. <a href=\"/\">Restart</a></HTML>", headers)
+        await req.respond(Http200, msg, headers)
     elif req.url.path == "/sauth":
         let params = req.url.query.parseQuery()
         let state = generateState()
