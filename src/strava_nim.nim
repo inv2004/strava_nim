@@ -36,6 +36,14 @@ proc main2() {.async.} =
         raise newException(ValueError, "Streams are not equal len")
     echo "1x15 (240) + 7x3 (310)".normalize_plan().process(t["time"], t["watts"])
 
+proc print_help() =
+    echo """
+    strava_nim         # to process all users from current database to current data
+    strava_nim --Xd    # the same like previous with X days back
+    strava_nim --test  # the same like previous without storing results
+    strava_nim --reg   # to start in http mode for registration
+"""
+
 when isMainModule:
     try:
         var http = false
@@ -43,8 +51,10 @@ when isMainModule:
         var testRun = false
 
         for kind, key, val in getopt():
-            echo kind, " - ", key, " - ", val
-            if key == "reg":
+            if key == "h" or key == "help":
+                print_help()
+                system.quit()
+            elif key == "reg":
                 http = true
             elif key.match(re"^\d+d$"):
                 daysOffset = parseInt(key[0..^2])
