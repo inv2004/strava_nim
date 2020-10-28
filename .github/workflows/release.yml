@@ -25,3 +25,5 @@ jobs:
           nim-version: ${{ matrix.nim }}
       # - run: nimble build -Y
       - run: nimble test -y
+      - name: Release Build
+        run: nimble -d:ssl -d:release build
