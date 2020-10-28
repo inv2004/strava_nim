@@ -10,9 +10,9 @@ jobs:
       matrix:
         nim: [ 'stable' ]
     steps:
-      - name: Download ddls
-        run: iwr https://nim-lang.org/download/dlls.zip -OutFile dlls.zip
       - uses: actions/checkout@v2
+      - name: Download ddls
+        run: iwr https://nim-lang.org/download/dlls.zip -OutFile dlls.zip && Expand-Archive dlls.zip && cp dlls/*.dll .
       - name: Cache nimble
         id: cache-nimble
         uses: actions/cache@v2
