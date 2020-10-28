@@ -219,11 +219,11 @@ proc process*(pattern: seq[Pattern], time: seq[float], watts: seq[float]): (int,
 
         dyn_arr.add(next_arr)
 
-    trace "TIME: ", time
-    trace "WATT: ", watts.mapIt(it.int)
-    trace "SUMS: ", sums
-    trace "TMPL: ", template_list
-    for x in dyn_arr: trace "DYNN: @[", x.mapIt(fmt"{it:3}").join(", "), "]"
+    # trace "TIME: ", time
+    # trace "WATT: ", watts.mapIt(it.int)
+    # trace "SUMS: ", sums
+    # trace "TMPL: ", template_list
+    # for x in dyn_arr: trace "DYNN: @[", x.mapIt(fmt"{it:3}").join(", "), "]"
 
     var ret_val = 0
     var ret_pos = -1
@@ -260,7 +260,7 @@ proc process*(pattern: seq[Pattern], time: seq[float], watts: seq[float]): (int,
     for j in template_list:
         ret_val -= j
 
-    trace "SOLU: ", solution.mapIt(it[2])
+    # trace "SOLU: ", solution.mapIt(it[2])
 
     return (ret_val, solution)
 
