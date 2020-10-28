@@ -22,7 +22,8 @@ type
     MyError* = object of Exception
 
 const
-    httpHost = "strava-nim.tradesim.org"
+    # httpHost = "strava-nim.tradesim.org"
+    httpHost = "localhost"
     httpPort = 8090
     #clientId = "438197548914-kp6b5mu5543gdinspvt5tgj0s71q1vbv.apps.googleusercontent.com"
     clientId = "438197548914-rd4afdt82qk0hd9qntp8bg2cd1pprp5v.apps.googleusercontent.com"
@@ -101,7 +102,6 @@ proc http_handler*(req: Request) {.async, gcsafe.} =
 
         # echo "Code is " & grantResponse.code
 
-        #let sheetId = "1oo_BljdsPXQC296TXY9h_vYgkrRhWQDul16yk0-6qGI"
         let sheetId = ""
 
         let msg = """
@@ -118,9 +118,11 @@ proc http_handler*(req: Request) {.async, gcsafe.} =
         await req.respond(Http200, msg, headers)
     elif req.url.path == "/check_sheet":
         let params = req.url.query.parseQuery()
+        let code = decodeUrl(params["code"])
+
         let resp = await client.getAuthorizationCodeAccessToken(
             accessTokenUrl,
-            params["code"],
+            code,
             clientId,
             clientSecret,
             redirectUri & "/gcode",
