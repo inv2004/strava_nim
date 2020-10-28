@@ -26,7 +26,7 @@ jobs:
       # - run: nimble build -Y
       - run: nimble test -y
       - name: Release Build
-        run: nimble -d:ssl -d:release build && Compress-Archive -Path strava_nim.exe,libeay64.dll -DestinationPath strava_nim_win_x64.zip
+        run: nimble -d:ssl -d:release build && Compress-Archive -Path strava_nim.exe,libeay64.dll,ssleay64.dll -DestinationPath strava_nim_win_x64.zip
       
       - name: Create Release
         id: create_release
