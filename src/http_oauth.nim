@@ -235,31 +235,36 @@ Ok<br/>Hello """ & athlete["firstname"].getStr() & " " & athlete[
         let params = req.url.query.parseQuery()
         let uid = params["uid"]
 
-        # let today = now() - initDuration(days = 3)
-        let today = initDateTime(30, mJan, 2020, 0, 0, 0, utc())
+        let today = now()  ## TODO: duplicate of process function
 
-        let (plan, _, _) = await getPlan(uid, today)
-        let (activity, tw) = await getActivity(uid, today)
+        try:
+            let (plan, _, _) = await getPlan(uid, today)
+            let (activity, tw) = await getActivity(uid, today)
 
-        let pattern = normalize_plan(plan)
-        let res = pattern.process(tw["time"], tw["watts"])
+            let pattern = normalize_plan(plan)
+            let res = pattern.process(tw["time"], tw["watts"])
 
-        let msg = """
-<HTML>
-    Example:
-    <table border=3>
-        <tr><td>Today:</td><td>""" & today.format("YYYY-MM-dd") &
-                """</td></tr>
-        <tr><td>Plan:</td><td>""" & plan &
-                """</td></tr>
-        <tr><td>Activity:</td><td>""" & activity &
-                """</td></tr>
-        <tr><td>Result:</td><td>""" & $res[1] & """</td></tr>
-    </table>
-    Your auth is saved and will be processes automatically
-</HTML>
-"""
-        await req.respond(Http200, msg, headers)
+            let msg = """
+    <HTML>
+        Example:
+        <table border=3>
+            <tr><td>Today:</td><td>""" & today.format("YYYY-MM-dd") &
+                    """</td></tr>
+            <tr><td>Plan:</td><td>""" & plan &
+                    """</td></tr>
+            <tr><td>Activity:</td><td>""" & activity &
+                    """</td></tr>
+            <tr><td>Result:</td><td>""" & $res[1] & """</td></tr>
+        </table>
+        Your auth is saved and will be processes automatically
+    </HTML>
+    """
+            await req.respond(Http200, msg, headers)
+        except MyError:
+            let msg = getCurrentExceptionMsg()
+            warn msg
+            await req.respond(Http200, "Exception: " & msg, headers)
+
     else:
         await req.respond(Http404, "Not Found")
 
