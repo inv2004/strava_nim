@@ -310,11 +310,7 @@ proc setResult(uid: string, row: int, oldText, res, activity: string) {.async.} 
     if res.len == 0:
         return
 
-    let zrPref =
-        if activity.toLowerAscii().find("race") >= 0: "ZR or "
-        else: ""
-
-    let newText = "bot: " & zrPref & res
+    let newText = "bot: " & res
 
     if newText == oldText:
         return
@@ -452,7 +448,12 @@ proc process(testRun: bool, today: DateTime, uid, email: string) {.async.} =
         let pattern = normalize_plan(plan)
         let (_, res) = pattern.process(tw["time"], tw["watts"])
 
-        let resStr = $res
+        let zrPref =
+            if activity.toLowerAscii().find("race") >= 0: "ZR or "
+            else: ""
+
+        let resStr = zrPref & $res
+
         info "Result: ", resStr
         if not testRun:
             await setResult(uid, row, text, resStr, activity)
