@@ -355,7 +355,7 @@ proc getActivity(uid: string, dt: DateTime): Future[(string, Table[string, seq[
     proc findToday(x: JsonNode): bool =
         x["start_date"].getStr("").startsWith(today_str.format())
 
-    let foundActivities = j.getElems().filter(findToday)
+    let foundActivities = j.getElems().filter(findToday).filterIt(it["type"].getStr().endsWith("Ride"))
     if foundActivities.len == 0:
         raise newException(MyError, "No records found in strava")
 
