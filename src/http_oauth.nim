@@ -18,6 +18,8 @@ import storage
 import times
 import analytic
 
+const resultCol = 'I'
+
 type
     MyError* = object of Exception
 
@@ -318,7 +320,7 @@ proc setResult(uid: string, row: int, oldText, res, activity: string) {.async.} 
     let accessToken = get_store(uid, "access_token")
     let sheetId = get_store(uid, "sheet_id")
 
-    let valueRange = "J" & $row
+    let valueRange = resultCol & $row
 
     let old = if oldText.len > 0: "\n  old: " & oldText else: ""
 
@@ -352,10 +354,12 @@ proc getActivity(uid: string, dt: DateTime): Future[(string, Table[string, seq[
 
     let today_str = dt.format("YYYY-MM-dd")
 
-    proc findToday(x: JsonNode): bool =
-        x["start_date"].getStr("").startsWith(today_str.format())
+    let foundDaysActivities = j.getElems().filterIt(it["start_date"].getStr("").startsWith(today_str))
+    
+    # system.quit(1)
 
-    let foundActivities = j.getElems().filter(findToday).filterIt(it["type"].getStr().endsWith("Ride"))
+    let foundActivities = foundDaysActivities.filterIt(it["type"].getStr().endsWith("Ride"))
+
     if foundActivities.len == 0:
         raise newException(MyError, "No records found in strava")
 
