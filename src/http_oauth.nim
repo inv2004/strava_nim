@@ -389,6 +389,10 @@ proc getActivities(uid: string, dt: DateTime): Future[seq[JsonNode]] {.async.} =
     let today_str = dt.format("YYYY-MM-dd")
 
     let foundDaysActivities = j.getElems().filterIt(it["start_date"].getStr("").startsWith(today_str))
+
+    let j1: JsonNode = %foundDaysActivities
+    var file = openAsync("1.json", fmWrite)
+    await file.write(j1.pretty)
     
     return foundDaysActivities
 
