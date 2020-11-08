@@ -341,7 +341,7 @@ proc setResultValue(uid: string, row: int, col: char, oldText, res: string) {.as
 
     let valueRange = col & $row
 
-    let old = if oldText.len > 0: "\n  old: " & oldText else: ""
+    let old = if oldText.len > 0 and col == resultCol: "\n  old: " & oldText else: ""
 
     let jReq = %*{
         "range": valueRange,
@@ -359,7 +359,7 @@ proc setResultValue(uid: string, row: int, col: char, oldText, res: string) {.as
 
     let j = parseJson(body)
     if j.contains("updatedCells") and j["updatedCells"].getInt == 1:
-        info "Spreadsheet updated"
+        info "Spreadsheet updated for " & col & $row
     else:
         raise newException(MyError, "error during cell update")
 
