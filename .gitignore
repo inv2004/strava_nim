@@ -8,3 +8,4 @@ ssleay64.dll
 tests/tester.exe
 src/analytic.exe
 strava_nim.log
+1.json
