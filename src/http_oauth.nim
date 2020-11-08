@@ -368,10 +368,23 @@ proc getKm(activities: seq[JsonNode]): string =
     if a.len > 0:
         result = "=" & a.join("+")
 
-proc getKilojoules(activities: seq[JsonNode]): string =
-    let a =  activities.mapIt(it{"kilojoules"}.getFloat()).mapIt(it / joulesToCal).mapIt(it.int).reversed()    
-    if a.len > 0:
-        result = "=" & a.join("+")
+proc getDetailedCalories(uid: string, id: BiggestInt): Future[int] {.async.} =
+    let stravaAccessToken = get_store(uid, "strava_access_token")
+    let res = await client.bearerRequest(stravaApi & "/activities/" & $id, stravaAccessToken)
+    let body = await res.body()
+    let j = parseJson(body)
+    return j["calories"].getFloat().int
+
+proc getKilojoules(uid: string, activities: seq[JsonNode]): Future[string] {.async.} =
+    var kjs = newSeq[int]()
+    for a in activities:
+        if a["type"].getStr() == "Run":
+            kjs.add await getDetailedCalories(uid, a["id"].getBiggestInt)
+        else:
+            kjs.add a{"kilojoules"}.getFloat().int
+
+    if kjs.len > 0:
+        result = "=" & kjs.reversed().join("+")
 
 proc getMovingTime(activities: seq[JsonNode]): string =
     let minutes = activities.mapIt(it{"moving_time"}.getFloat()).foldl(a + b) / 60
@@ -395,7 +408,6 @@ proc getActivities(uid: string, dt: DateTime): Future[seq[JsonNode]] {.async.} =
     await file.write(j1.pretty)
     
     return foundDaysActivities
-
 
 proc getBikeActivity(uid: string, activities: seq[JsonNode]): Future[(string, Table[string, seq[
         float]])] {.async.} =
@@ -494,7 +506,7 @@ proc process(testRun: bool, today: DateTime, uid, email: string) {.async.} =
 
         let km = getKm(activities)
         let time = getMovingTime(activities)
-        let kcal = getKilojoules(activities)
+        let kcal = await getKilojoules(uid, activities)
 
         if not testRun:
             await setResultValue(uid, row, kmCol, old[0], km)
