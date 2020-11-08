@@ -13,12 +13,20 @@ import tables
 import sugar
 import strformat
 import logging
+import algorithm
 
 import storage
 import times
 import analytic
 
+const kmCol = 'F'
+const mTimeCol = 'G'
+const kCalCol = 'H'
 const resultCol = 'I'
+
+const valueInputType = "USER_ENTERED"
+
+const joulesToCal = 4.184
 
 type
     MyError* = object of Exception
@@ -241,7 +249,8 @@ Ok<br/>Hello """ & athlete["firstname"].getStr() & " " & athlete[
 
         try:
             let (plan, _, _) = await getPlan(uid, today)
-            let (activity, tw) = await getActivity(uid, today)
+            let activities = await getActivities(uid, today)
+            let (activity, tw) = await getBikeActivity(uid, activities)
 
             let pattern = normalize_plan(plan)
             let res = pattern.process(tw["time"], tw["watts"])
@@ -270,7 +279,7 @@ Ok<br/>Hello """ & athlete["firstname"].getStr() & " " & athlete[
     else:
         await req.respond(Http404, "Not Found")
 
-proc getPlan(uid: string, dt: DateTime): Future[(string, int, string)] {.async.} =
+proc getPlan(uid: string, dt: DateTime): Future[(string, int, seq[string])] {.async.} =
     debug "Requesting current plan"
     let accessToken = get_store(uid, "access_token")
     let sheetId = get_store(uid, "sheet_id")
@@ -278,7 +287,9 @@ proc getPlan(uid: string, dt: DateTime): Future[(string, int, string)] {.async.}
     let valueRange = "A:J"
     let res = await client.bearerRequest(sheetApi & "/" & sheetId & "/values/" &
             valueRange & "?majorDimension=ROWS", accessToken)
+            # valueRange & "?majorDimension=ROWS&valueRenderOption=FORMULA", accessToken)
     let body = await res.body()
+
     let j = parseJson(body)
 
     let today_str = dt.format("M/d/YYYY")
@@ -291,6 +302,7 @@ proc getPlan(uid: string, dt: DateTime): Future[(string, int, string)] {.async.}
             ""
 
     let elems = j["values"].getElems()
+
     let idx = elems.mapIt(it.mapDate()).find(today_str)
 
     # let foundDates = j["values"].getElems().filter(checkFirst)
@@ -300,19 +312,26 @@ proc getPlan(uid: string, dt: DateTime): Future[(string, int, string)] {.async.}
     debug "Current day found in plan"
 
     let currentDay = elems[idx][4].getStr
-    let text = if elems[idx].len >= 10: elems[idx][9].getStr else: ""
+
+    var old = newSeq[string]()
+
+    old.add elems[idx]{5}.getStr()
+    old.add elems[idx]{6}.getStr()
+    old.add elems[idx]{7}.getStr()
+    old.add elems[idx]{8}.getStr()
+
     let idx2 = idx + 1
 
-    info "Current plan: " & currentDay & "    row: " & $idx2 & "    text: " & text
+    info "Current plan: " & currentDay & "    row: " & $idx2 & "    old: " & old.join()
 
-    return (currentDay, idx+1, text)
+    return (currentDay, idx+1, old)
 
-proc setResult(uid: string, row: int, oldText, res, activity: string) {.async.} =
 
+proc setResultValue(uid: string, row: int, col: char, oldText, res: string) {.async.} =
     if res.len == 0:
         return
 
-    let newText = "bot: " & res
+    let newText = if col == resultCol: "bot: " & res else: res
 
     if newText == oldText:
         return
@@ -320,7 +339,7 @@ proc setResult(uid: string, row: int, oldText, res, activity: string) {.async.} 
     let accessToken = get_store(uid, "access_token")
     let sheetId = get_store(uid, "sheet_id")
 
-    let valueRange = resultCol & $row
+    let valueRange = col & $row
 
     let old = if oldText.len > 0: "\n  old: " & oldText else: ""
 
@@ -332,19 +351,34 @@ proc setResult(uid: string, row: int, oldText, res, activity: string) {.async.} 
 
     var headers = newHttpHeaders([("Content-Type", "application/json")])
 
-    let res = await client.bearerRequest(sheetApi & "/" & sheetId & "/values/" &
-            valueRange & "?valueInputOption=RAW", accessToken,
+    let res = await client.bearerRequest(sheetApi & "/" & sheetId & "/values/" & valueRange & "?valueInputOption=" & valueInputType
+            , accessToken,
             httpMethod = HttpPut, body = $jReq, extraHeaders = headers)
 
     let body = await res.body()
+
     let j = parseJson(body)
     if j.contains("updatedCells") and j["updatedCells"].getInt == 1:
         info "Spreadsheet updated"
     else:
         raise newException(MyError, "error during cell update")
 
-proc getActivity(uid: string, dt: DateTime): Future[(string, Table[string, seq[
-        float]])] {.async.} =
+proc getKm(activities: seq[JsonNode]): string =
+    let a =  activities.mapIt(it{"distance"}.getFloat()).mapIt(it / 1000).mapIt(it.int).reversed()    
+    if a.len > 0:
+        result = "=" & a.join("+")
+
+proc getKilojoules(activities: seq[JsonNode]): string =
+    let a =  activities.mapIt(it{"kilojoules"}.getFloat()).mapIt(it / joulesToCal).mapIt(it.int).reversed()    
+    if a.len > 0:
+        result = "=" & a.join("+")
+
+proc getMovingTime(activities: seq[JsonNode]): string =
+    let minutes = activities.mapIt(it{"moving_time"}.getFloat()).foldl(a + b) / 60
+    let dp = initDuration(minutes = minutes.int64).toParts()
+    return fmt"{dp[Hours]}:{dp[Minutes]:02d}"
+
+proc getActivities(uid: string, dt: DateTime): Future[seq[JsonNode]] {.async.} =
     let stravaAccessToken = get_store(uid, "strava_access_token")
 
     let res = await client.bearerRequest(stravaApi &
@@ -356,12 +390,15 @@ proc getActivity(uid: string, dt: DateTime): Future[(string, Table[string, seq[
 
     let foundDaysActivities = j.getElems().filterIt(it["start_date"].getStr("").startsWith(today_str))
     
-    # system.quit(1)
+    return foundDaysActivities
 
-    let foundActivities = foundDaysActivities.filterIt(it["type"].getStr().endsWith("Ride"))
+
+proc getBikeActivity(uid: string, activities: seq[JsonNode]): Future[(string, Table[string, seq[
+        float]])] {.async.} =
+    let foundActivities = activities.filterIt(it["type"].getStr().endsWith("Ride"))
 
     if foundActivities.len == 0:
-        raise newException(MyError, "No records found in strava")
+        raise newException(MyError, "No Ride records found in strava")
 
     let currentActivity = foundActivities[0]
 
@@ -372,6 +409,8 @@ proc getActivity(uid: string, dt: DateTime): Future[(string, Table[string, seq[
     upd_store(uid, "utc_offset", $utc_offset)
 
     debug "get: " & stravaApi & "/activities/" & $id & "?include_all_efforts=false"
+
+    let stravaAccessToken = get_store(uid, "strava_access_token")
 
     let res2 = await client.bearerRequest(stravaApi & "/activities/" & $id &
             "?include_all_efforts=false", stravaAccessToken)
@@ -446,8 +485,19 @@ proc process(testRun: bool, today: DateTime, uid, email: string) {.async.} =
     # let today = initDateTime(01, mApr, 2020, 0, 0, 0, utc())
 
     try:
-        let (plan, row, text) = await getPlan(uid, today)
-        let (activity, tw) = await getActivity(uid, today)
+        let (plan, row, old) = await getPlan(uid, today)
+        let activities = await getActivities(uid, today)
+
+        let km = getKm(activities)
+        let time = getMovingTime(activities)
+        let kcal = getKilojoules(activities)
+
+        if not testRun:
+            await setResultValue(uid, row, kmCol, old[0], km)
+            await setResultValue(uid, row, mTimeCol, old[1], time)
+            await setResultValue(uid, row, kCalCol, old[2], kcal)
+
+        let (activity, tw) = await getBikeActivity(uid, activities)
 
         let pattern = normalize_plan(plan)
         let (_, res) = pattern.process(tw["time"], tw["watts"])
@@ -459,8 +509,13 @@ proc process(testRun: bool, today: DateTime, uid, email: string) {.async.} =
         let resStr = zrPref & $res
 
         info "Result: ", resStr
+        info "    km: ", km
+        info "  Time: ", time
+        info "  KCal: ", kcal
+
         if not testRun:
-            await setResult(uid, row, text, resStr, activity)
+            await setResultValue(uid, row, resultCol, old[2], resStr)
+
     except MyError:
         warn getCurrentExceptionMsg()
 
