@@ -384,7 +384,10 @@ proc getKilojoules(uid: string, activities: seq[JsonNode]): Future[string] {.asy
             kjs.add a{"kilojoules"}.getFloat().int
 
     if kjs.len > 0:
-        result = "=" & kjs.reversed().join("+")
+        if kjs.foldl(a + b) == 0:
+            return ""
+        else:
+            return "=" & kjs.reversed().join("+")
 
 proc getMovingTime(activities: seq[JsonNode]): string =
     let minutes = activities.mapIt(it{"moving_time"}.getFloat()).foldl(a + b) / 60
