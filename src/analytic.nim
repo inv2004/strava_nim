@@ -183,13 +183,17 @@ proc expandTemplate(pattern: seq[Pattern]): seq[int] =
             result.add(val.duration.int)
 
 
-proc process*(pattern: seq[Pattern], time: seq[float], watts: seq[float]): (int, seq[Interval]) =
+proc process*(pattern: seq[Pattern], tw: seq[(string, seq[float], seq[float])]): (int, seq[Interval]) =
     trace "processing: " & $pattern
 
-#   echo "time: ", time
-#   echo "watt: ", watts
+    if tw.len == 0:
+        return (0, @[])
 
-    let sums = movingSum(time, watts)
+    var sums: seq[int] = @[]
+
+    for (_, time, watts) in tw:
+        sums.add movingSum(time, watts)
+
     let n = sums.len - 1
 
     let template_list = expandTemplate(pattern)
@@ -220,8 +224,8 @@ proc process*(pattern: seq[Pattern], time: seq[float], watts: seq[float]): (int,
         dyn_arr.add(next_arr)
 
     when not defined(release):
-        trace "TIME: ", time
-        trace "WATT: ", watts.mapIt(it.int)
+        # trace "TIME: ", time
+        # trace "WATT: ", watts.mapIt(it.int)
         trace "SUMS: ", sums
         trace "TMPL: ", template_list
         for x in dyn_arr: trace "DYNN: @[", x.mapIt(fmt"{it:3}").join(", "), "]"
