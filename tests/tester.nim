@@ -76,7 +76,7 @@ test "find_best_multiple":
     let t = @[0,  1,  2,  3,  4,  5,  6,  7 ].map(x => x.float)
     let w = @[10, 10, 20, 30, 40, 40, 50, 50].map(x => x.float)
     let t2 = @[0,  1,  2,  3,  4,  5,  6,  7 ].map(x => x.float)
-    let w2 = @[10, 10, 20, 30, 40, 40, 60, 50].map(x => x.float)
+    let w2 = @[80, 10, 20, 30, 40, 40, 60, 50].map(x => x.float)
     let (_, res) = @[(1,4.0), (1,2.0)].process(@[("", t, w), ("", t2, w2)])
     res.assert_eq @[(45.0, 4, 7), (55.0, 15, 16)]
 
