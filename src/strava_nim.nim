@@ -34,7 +34,7 @@ proc main2() {.async.} =
             y => y.getFloat))).toTable
     if t["time"].len != t["watts"].len:
         raise newException(ValueError, "Streams are not equal len")
-    echo "1x15 (240) + 7x3 (310)".normalize_plan().process(t["time"], t["watts"])
+    echo "1x15 (240) + 7x3 (310)".normalize_plan().process(@[("abc", t["time"], t["watts"])])
 
 proc print_help() =
     echo """

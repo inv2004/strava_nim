@@ -250,10 +250,13 @@ Ok<br/>Hello """ & athlete["firstname"].getStr() & " " & athlete[
         try:
             let (plan, _, _) = await getPlan(uid, today)
             let activities = await getActivities(uid, today)
-            let (activity, tw) = await getBikeActivity(uid, activities)
+            let tw = await getBikeActivities(uid, activities)
+
+            if tw.len == 0:
+                raise newException(MyError, "not bike activities found")
 
             let pattern = normalize_plan(plan)
-            let res = pattern.process(tw["time"], tw["watts"])
+            let res = pattern.process(tw)
 
             let msg = """
     <HTML>
@@ -263,7 +266,7 @@ Ok<br/>Hello """ & athlete["firstname"].getStr() & " " & athlete[
                     """</td></tr>
             <tr><td>Plan:</td><td>""" & plan &
                     """</td></tr>
-            <tr><td>Activity:</td><td>""" & activity &
+            <tr><td>Activity:</td><td>""" & tw[0][0] &
                     """</td></tr>
             <tr><td>Result:</td><td>""" & $res[1] & """</td></tr>
         </table>
@@ -412,47 +415,47 @@ proc getActivities(uid: string, dt: DateTime): Future[seq[JsonNode]] {.async.} =
     
     return foundDaysActivities
 
-proc getBikeActivity(uid: string, activities: seq[JsonNode]): Future[(string, Table[string, seq[
-        float]])] {.async.} =
+proc getBikeActivities(uid: string, activities: seq[JsonNode]): Future[seq[(string, seq[float], seq[float])]] {.async.} =
     let foundActivities = activities.filterIt(it["type"].getStr().endsWith("Ride"))
 
     if foundActivities.len == 0:
         raise newException(MyError, "No Ride records found in strava")
 
-    let currentActivity = foundActivities[0]
+    for currentActivity in foundActivities:
 
-    info "Strava activity name: ", currentActivity["name"].getStr
-    let id = currentActivity["id"].getBiggestInt
+        info "Strava activity name: ", currentActivity["name"].getStr
+        let id = currentActivity["id"].getBiggestInt
 
-    let utc_offset = currentActivity["utc_offset"].getFloat
-    upd_store(uid, "utc_offset", $utc_offset)
+        let utc_offset = currentActivity["utc_offset"].getFloat
+        upd_store(uid, "utc_offset", $utc_offset)
 
-    debug "get: " & stravaApi & "/activities/" & $id & "?include_all_efforts=false"
+        debug "get: " & stravaApi & "/activities/" & $id & "?include_all_efforts=false"
 
-    let stravaAccessToken = get_store(uid, "strava_access_token")
+        let stravaAccessToken = get_store(uid, "strava_access_token")
 
-    let res2 = await client.bearerRequest(stravaApi & "/activities/" & $id &
-            "?include_all_efforts=false", stravaAccessToken)
-    let body2 = await res2.body()
-    let j2 = parseJson(body2)
+        let res2 = await client.bearerRequest(stravaApi & "/activities/" & $id &
+                "?include_all_efforts=false", stravaAccessToken)
+        let body2 = await res2.body()
+        let j2 = parseJson(body2)
 
-    let res3 = await client.bearerRequest(stravaApi & "/activities/" & $id &
-            "/streams/time,watts?resolution=high&series_type=time", stravaAccessToken)
-    let body3 = await res3.body()
-    let j3 = parseJson(body3)
+        let res3 = await client.bearerRequest(stravaApi & "/activities/" & $id &
+                "/streams/time,watts?resolution=high&series_type=time", stravaAccessToken)
+        let body3 = await res3.body()
+        let j3 = parseJson(body3)
 
-    let t = j3.getElems().map(x => (x["type"].getStr, x["data"].getElems().map(
-            y => y.getFloat))).toTable
+        let t = j3.getElems().map(x => (x["type"].getStr, x["data"].getElems().map(
+                y => y.getFloat))).toTable
 
-    if t["time"].len != t["watts"].len:
-        raise newException(MyError, "Streams are not equal len")
+        if t["time"].len != t["watts"].len:
+            raise newException(MyError, "Streams are not equal len")
 
-    var file = openAsync("2.json", fmWrite)
-    await file.write(j3.pretty)
-    file.close()
+        var file = openAsync("2.json", fmWrite)
+        await file.write(j3.pretty)
+        file.close()
 
-    return (j2["name"].getStr() & " " & $j2["distance"].getFloat() & "m " & j2[
-            "type"].getStr(), t)
+        let actName = j2["name"].getStr() & " " & $j2["distance"].getFloat() & "m " & j2["type"].getStr()
+
+        result.add @[(actName, t["time"], t["watts"])]
 
 proc refresh_token(uid: string, prefix = ""): Future[string] {.async.} =
     info "Checking token for " & prefix
@@ -495,6 +498,18 @@ proc process_all*(testRun: bool, daysOffset: int) {.async.} =
     if empty:
         warn "No records found. Try to run with --reg flag for registration"
 
+proc getBikeResults(uid: string, plan: string, activities: seq[JsonNode]): Future[string] {.async.} =
+    let tw = await getBikeActivities(uid, activities)
+
+    let pattern = normalize_plan(plan)
+    let (_, res) = pattern.process(tw)
+
+    let zrPref =
+        if tw.anyIt(it[0].toLowerAscii().find("race") >= 0): "ZR or "
+        else: ""
+
+    result = zrPref & $res
+
 proc process(testRun: bool, today: DateTime, uid, email: string) {.async.} =
     let fmt = "yyyy-MM-dd"
     let test = if testRun:"testRun" else:""
@@ -511,29 +526,21 @@ proc process(testRun: bool, today: DateTime, uid, email: string) {.async.} =
         let time = getMovingTime(activities)
         let kcal = await getKilojoules(uid, activities)
 
-        if not testRun:
-            await setResultValue(uid, row, kmCol, old[0], km)
-            await setResultValue(uid, row, mTimeCol, old[1], time)
-            await setResultValue(uid, row, kCalCol, old[2], kcal)
-
-        let (activity, tw) = await getBikeActivity(uid, activities)
-
-        let pattern = normalize_plan(plan)
-        let (_, res) = pattern.process(tw["time"], tw["watts"])
-
-        let zrPref =
-            if activity.toLowerAscii().find("race") >= 0: "ZR or "
-            else: ""
-
-        let resStr = zrPref & $res
-
-        info "Result: ", resStr
         info "    km: ", km
         info "  Time: ", time
         info "  KCal: ", kcal
 
         if not testRun:
-            await setResultValue(uid, row, resultCol, old[2], resStr)
+            await setResultValue(uid, row, kmCol, old[0], km)
+            await setResultValue(uid, row, mTimeCol, old[1], time)
+            await setResultValue(uid, row, kCalCol, old[2], kcal)
+
+        let res = await getBikeResults(uid, plan, activities)
+
+        info "Result: ", res
+
+        if not testRun:
+            await setResultValue(uid, row, resultCol, old[2], res)
 
     except MyError:
         warn getCurrentExceptionMsg()
