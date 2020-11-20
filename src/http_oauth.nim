@@ -367,9 +367,12 @@ proc setResultValue(uid: string, row: int, col: char, oldText, res: string) {.as
         raise newException(MyError, "error during cell update")
 
 proc getKm(activities: seq[JsonNode]): string =
-    let a =  activities.mapIt(it{"distance"}.getFloat()).mapIt(it / 1000).mapIt(it.int).reversed()    
+    let a =  activities.mapIt(it{"distance"}.getFloat()).mapIt(it / 1000).mapIt(it.int).reversed()
     if a.len > 0:
-        result = "=" & a.join("+")
+        if a.len == 1 and a.foldl(a+b) == 0:
+            discard
+        else:
+            result = "=" & a.join("+")
 
 proc getDetailedCalories(uid: string, id: BiggestInt): Future[int] {.async.} =
     let stravaAccessToken = get_store(uid, "strava_access_token")
