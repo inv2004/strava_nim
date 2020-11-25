@@ -14,6 +14,7 @@ import sugar
 import strformat
 import logging
 import algorithm
+import math
 
 import storage
 import times
@@ -369,7 +370,7 @@ proc setResultValue(uid: string, row: int, col: char, oldText, res: string) {.as
 proc getKm(activities: seq[JsonNode]): string =
     let a =  activities.mapIt(it{"distance"}.getFloat()).mapIt(it / 1000).mapIt(it.int).reversed()
     if a.len > 0:
-        if a.len == 1 and a.foldl(a+b) == 0:
+        if a.len == 1 and a.sum() == 0:
             discard
         else:
             result = "=" & a.join("+")
@@ -390,15 +391,18 @@ proc getKilojoules(uid: string, activities: seq[JsonNode]): Future[string] {.asy
             kjs.add a{"kilojoules"}.getFloat().int
 
     if kjs.len > 0:
-        if kjs.foldl(a + b) == 0:
+        if kjs.sum() == 0:
             return ""
         else:
             return "=" & kjs.reversed().join("+")
 
 proc getMovingTime(activities: seq[JsonNode]): string =
-    let minutes = activities.mapIt(it{"moving_time"}.getFloat()).foldl(a + b) / 60
+    let minutes = activities.mapIt(it{"moving_time"}.getFloat()).sum() / 60
+    if minutes == 0:
+        return ""
     let dp = initDuration(minutes = minutes.int64).toParts()
     return fmt"{dp[Hours]}:{dp[Minutes]:02d}"
+
 
 proc getActivities(uid: string, dt: DateTime): Future[seq[JsonNode]] {.async.} =
     let stravaAccessToken = get_store(uid, "strava_access_token")
