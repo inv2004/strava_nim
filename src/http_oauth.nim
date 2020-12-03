@@ -547,7 +547,7 @@ proc process(testRun: bool, today: DateTime, uid, email: string) {.async.} =
         info "Result: ", res
 
         if not testRun:
-            await setResultValue(uid, row, resultCol, old[2], res)
+            await setResultValue(uid, row, resultCol, old[3], res)
 
     except MyError:
         warn getCurrentExceptionMsg()
