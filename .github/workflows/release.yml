@@ -52,14 +52,14 @@ jobs:
       - run: nimble test -y
       - name: Copy to Dest (windows)
         if: startsWith(matrix.os, 'windows') == true
-        run: nimble -d:release build && mkdir strava_nim && cp strava_nim.exe,libeay64.dll,ssleay64.dll,pcre64.dll strava_nim
+        run: nimble -d:release build && mkdir -p dist/strava_nim && cp strava_nim.exe,libeay64.dll,ssleay64.dll,pcre64.dll dist/strava_nim
         #  && Compress-Archive -Path strava_nim -DestinationPath strava_nim_win_x64.zip
       - name: Copy to Dest (linux/macos)
         if: startsWith(matrix.os, 'windows') != true
-        run: nimble -d:release build && mkdir strava_nim_dir && mv strava_nim strava_nim_dir && mv strava_nim_dir strava_nim
+        run: nimble -d:release build && mkdir -p dist/strava_nim && mv strava_nim dist/strava_nim
       - uses: papeloto/action-zip@v1
         with:
-          files: strava_nim/
+          files: dist/
           dest: strava_nim_${{ matrix.os }}.zip
       - name: Upload Release Asset
         id: upload-release-asset 
