@@ -59,7 +59,7 @@ jobs:
         run: nimble -d:release build && mkdir strava_nim_dir && mv strava_nim strava_nim_dir && mv strava_nim_dir strava_nim
       - uses: papeloto/action-zip@v1
         with:
-          files: strava-nim/
+          files: strava_nim/
           dest: strava_nim_${{ matrix.os }}.zip
       - name: Upload Release Asset
         id: upload-release-asset 
