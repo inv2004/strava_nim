@@ -50,11 +50,12 @@ jobs:
         with:
           nim-version: ${{ matrix.nim }}
       - run: nimble test -y
-      - name: Copy to Dest
+      - name: Copy to Dest (windows)
+        if: startsWith(matrix.os, 'windows') == true
         run: nimble -d:release build && mkdir strava_nim && cp strava_nim.exe,libeay64.dll,ssleay64.dll,pcre64.dll strava_nim
         #  && Compress-Archive -Path strava_nim -DestinationPath strava_nim_win_x64.zip
-      - name: Copy DDLs
-        if: ! startsWith(matrix.os, 'windows')
+      - name: Copy to Dest (linux/macos)
+        if: startsWith(matrix.os, 'windows') != true
         run: nimble -d:release build && mkdir strava_nim && cp strava_nim strava_nim
       - uses: papeloto/action-zip@v1
         with:
