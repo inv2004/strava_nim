@@ -28,7 +28,7 @@ jobs:
 
   build_release:
     needs: create_release
-    timeout-minutes: 5
+    timeout-minutes: 10
     strategy:
       matrix:
         nim: [ 'stable' ]
