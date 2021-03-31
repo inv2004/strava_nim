@@ -52,7 +52,8 @@ const
     stravaAuthorizeUrl = "http://www.strava.com/oauth/authorize"
     stravaAccessTokenUrl = "https://www.strava.com/oauth/token"
     stravaApi = "https://www.strava.com/api/v3"
-    stravaPageLimit = 100
+    stravaPageLimit = 50
+    stravaPagesMax = 5
 
 var server = newAsyncHttpServer()
 
@@ -406,21 +407,29 @@ proc getMovingTime(activities: seq[JsonNode]): string =
 
 proc getActivities(uid: string, dt: DateTime): Future[seq[JsonNode]] {.async.} =
     let stravaAccessToken = get_store(uid, "strava_access_token")
-
-    let res = await client.bearerRequest(stravaApi &
-            "/athlete/activities?per_page=" & $stravaPageLimit, stravaAccessToken)
-    let body = await res.body()
-    let j = parseJson(body)
-
     let today_str = dt.format("YYYY-MM-dd")
 
-    let foundDaysActivities = j.getElems().filterIt(it["start_date"].getStr("").startsWith(today_str))
+    for page in 1..stravaPagesMax:
+        let res = await client.bearerRequest(stravaApi &
+                "/athlete/activities?page=" & $page & "&per_page=" & $stravaPageLimit, stravaAccessToken)
+        let body = await res.body()
+        let j = parseJson(body)
 
-    let j1: JsonNode = %foundDaysActivities
-    var file = openAsync("1.json", fmWrite)
-    await file.write(j1.pretty)
-    
-    return foundDaysActivities
+        let elems = j.getElems()
+
+        if elems.len > 0:
+            let lastDateOnPage = elems[^1]["start_date"].getStr(newString(10))[0..9]
+            if today_str < lastDateOnPage:
+                info "The last date on strava's page is ", lastDateOnPage, " trying next page"
+                continue
+
+        let foundDaysActivities = elems.filterIt(it["start_date"].getStr("").startsWith(today_str))
+
+        let j1: JsonNode = %foundDaysActivities
+        var file = openAsync("1.json", fmWrite)
+        await file.write(j1.pretty)
+        
+        return foundDaysActivities
 
 proc getBikeActivities(uid: string, activities: seq[JsonNode]): Future[seq[(string, seq[float], seq[float])]] {.async.} =
     let foundActivities = activities.filterIt(it["type"].getStr().endsWith("Ride"))
