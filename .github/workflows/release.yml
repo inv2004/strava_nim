@@ -31,7 +31,7 @@ jobs:
     timeout-minutes: 10
     strategy:
       matrix:
-        nim: [ 'stable' ]
+        nim: [ '1.4.2' ]
         os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     steps:
@@ -52,7 +52,7 @@ jobs:
       - run: nimble test -y
       - name: Copy to Dest (windows)
         if: startsWith(matrix.os, 'windows') == true
-        run: nimble -d:release build && mkdir -p dist/strava_nim && cp strava_nim.exe,libeay64.dll,ssleay64.dll,pcre64.dll dist/strava_nim
+        run: nimble -d:release build && mkdir -p dist/strava_nim && cp strava_nim.exe,libssl-1_1-x64.dll,pcre64.dll dist/strava_nim
         #  && Compress-Archive -Path strava_nim -DestinationPath strava_nim_win_x64.zip
       - name: Copy to Dest (linux/macos)
         if: startsWith(matrix.os, 'windows') != true
