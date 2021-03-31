@@ -6,6 +6,7 @@ import re
 import strutils
 import sugar
 import logging
+import math
 
 type
     Interval* = tuple
@@ -35,7 +36,7 @@ proc `$`*(d: times.Duration): string =
     fmt"{d[Hours]}:{d[Minutes]:02}:{d[Seconds]:02}"
 
 proc normalize_plan*(plan: string): seq[Pattern] =
-    for x in plan.findAll(re"\d+x\d+[smh]?"):
+    for x in plan.findAll(re"(\d+x\d+x\(5/25\)|\d+x\d+[smh]?)"):
         var str = x
         let m =
             if x.endsWith "s":
@@ -50,8 +51,13 @@ proc normalize_plan*(plan: string): seq[Pattern] =
             else:
                 60
         let vals = str.split('x')
-        let pattern: Pattern = (vals[0].parseInt, (m * vals[1].parseInt).float)
-        result.add(pattern)
+        if vals.len == 3:
+            let workAndRest = vals[2][1..^2].split('/')
+            let pattern: Pattern = (vals[0].parseInt * vals[1].parseInt, workAndRest[0].parseInt().float)
+            result.add(pattern)
+        else:
+            let pattern: Pattern = (vals[0].parseInt, (m * vals[1].parseInt).float)
+            result.add(pattern)
 
 proc fmt_duration(x: float): string =
     let x = x.int
