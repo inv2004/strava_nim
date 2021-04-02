@@ -53,7 +53,6 @@ const
     stravaAccessTokenUrl = "https://www.strava.com/oauth/token"
     stravaApi = "https://www.strava.com/api/v3"
     stravaPageLimit = 50
-    stravaPagesMax = 5
 
 var server = newAsyncHttpServer()
 
@@ -251,7 +250,7 @@ Ok<br/>Hello """ & athlete["firstname"].getStr() & " " & athlete[
 
         try:
             let (plan, _, _) = await getPlan(uid, today)
-            let activities = await getActivities(uid, today)
+            let activities = await getActivities(uid, today, 3)
             let tw = await getBikeActivities(uid, activities)
 
             if tw.len == 0:
@@ -405,7 +404,7 @@ proc getMovingTime(activities: seq[JsonNode]): string =
     return fmt"{dp[Hours]}:{dp[Minutes]:02d}"
 
 
-proc getActivities(uid: string, dt: DateTime): Future[seq[JsonNode]] {.async.} =
+proc getActivities(uid: string, dt: DateTime, stravaPagesMax: int): Future[seq[JsonNode]] {.async.} =
     let stravaAccessToken = get_store(uid, "strava_access_token")
     let today_str = dt.format("YYYY-MM-dd")
 
@@ -504,12 +503,12 @@ proc refresh_token(uid: string, prefix = ""): Future[string] {.async.} =
 
     return get_store(uid, prefix & "access_token")
 
-proc process_all*(testRun: bool, daysOffset: int) {.async.} =
+proc process_all*(testRun: bool, daysOffset, stravaPagesMax: int) {.async.} =
     var empty = true
     let today = now() - initDuration(days = daysOffset)
     for (uid, email) in get_uids():
         empty = false
-        await process(testRun, today, uid, email)
+        await process(testRun, today, uid, email, stravaPagesMax)
 
     if empty:
         warn "No records found. Try to run with --reg flag for registration"
@@ -526,7 +525,7 @@ proc getBikeResults(uid: string, plan: string, activities: seq[JsonNode]): Futur
 
     result = zrPref & $res
 
-proc process(testRun: bool, today: DateTime, uid, email: string) {.async.} =
+proc process(testRun: bool, today: DateTime, uid, email: string, stravaPagesMax: int) {.async.} =
     let fmt = "yyyy-MM-dd"
     let test = if testRun:"testRun" else:""
     info fmt"Processing {uid} ({email}) for {today.format(fmt)} {test}"
@@ -536,7 +535,7 @@ proc process(testRun: bool, today: DateTime, uid, email: string) {.async.} =
 
     try:
         let (plan, row, old) = await getPlan(uid, today)
-        let activities = await getActivities(uid, today)
+        let activities = await getActivities(uid, today, stravaPagesMax)
 
         let km = getKm(activities)
         let time = getMovingTime(activities)
