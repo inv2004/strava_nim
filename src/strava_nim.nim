@@ -48,6 +48,7 @@ when isMainModule:
     try:
         var http = false
         var daysOffset = 0
+        var stravaPagesMax = 3
         var testRun = false
 
         for kind, key, val in getopt():
@@ -58,13 +59,15 @@ when isMainModule:
                 http = true
             elif key.match(re"^\d+d$"):
                 daysOffset = parseInt(key[0..^2])
+            elif key.match(re"^\d+p$"):
+                stravaPagesMax = parseInt(key[0..^2])
             elif key == "test":
                 testRun = true
             
         if http:
             waitFor http()
         else:
-            waitFor process_all(testRun, daysOffset)
+            waitFor process_all(testRun, daysOffset, stravaPagesMax)
     except:
         error "Exception: " & getCurrentExceptionMsg()
 
