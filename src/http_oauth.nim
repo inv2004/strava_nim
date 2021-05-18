@@ -453,25 +453,33 @@ proc getBikeActivities(uid: string, activities: seq[JsonNode]): Future[seq[(stri
         let body2 = await res2.body()
         let j2 = parseJson(body2)
 
-        let res3 = await client.bearerRequest(stravaApi & "/activities/" & $id &
-                "/streams/time,watts?resolution=high&series_type=time", stravaAccessToken)
-        let body3 = await res3.body()
-        let j3 = parseJson(body3)
-
         var file = openAsync("2.json", fmWrite)
-        await file.write(j3.pretty)
-
-        let t = j3.getElems().map(x => (x["type"].getStr, x["data"].getElems().map(
-                y => y.getFloat))).toTable
-
-        if t["time"].len != t["watts"].len:
-            raise newException(MyError, "Streams are not equal len")
-
+        await file.write(j2.pretty)
         file.close()
 
         let actName = j2["name"].getStr() & " " & $j2["distance"].getFloat() & "m " & j2["type"].getStr()
 
-        result.add @[(actName, t["time"], t["watts"])]
+        if j2["device_watts"].getBool():
+            debug "get: " & stravaApi & "/activities/" & $id & "/streams/time,watts?resolution=high&series_type=time"
+
+            let res3 = await client.bearerRequest(stravaApi & "/activities/" & $id &
+                    "/streams/time,watts?resolution=high&series_type=time", stravaAccessToken)
+            let body3 = await res3.body()
+            let j3 = parseJson(body3)
+
+            file = openAsync("3.json", fmWrite)
+            await file.write(j3.pretty)
+            file.close()
+
+            let t = j3.getElems().map(x => (x["type"].getStr, x["data"].getElems().map(
+                    y => y.getFloat))).toTable
+
+            if t["time"].len != t["watts"].len:
+                raise newException(MyError, "Streams are not equal len")
+
+            result.add @[(actName, t["time"], t["watts"])]
+        else:
+            result.add @[(actName, newSeq[float](), newSeq[float]())]            
 
 proc refresh_token(uid: string, prefix = ""): Future[string] {.async.} =
     info "Checking token for " & prefix
