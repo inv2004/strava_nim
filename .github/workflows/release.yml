@@ -52,7 +52,11 @@ jobs:
       - run: nimble test -y
       - name: Copy to Dest (windows)
         if: startsWith(matrix.os, 'windows') == true
-        run: nimble -d:release build && mkdir -p dist/strava_nim && cp strava_nim.exe,libcrypto-1_1-x64.dll,libssl-1_1-x64.dll,pcre64.dll dist/strava_nim
+        run: |
+          nimble -d:release build && \
+          mkdir -p dist/strava_nim && \
+          cp strava_nim.exe,libcrypto-1_1-x64.dll,libssl-1_1-x64.dll,pcre64.dll dist/strava_nim && \
+          curl -output-dir dist/strava_nim -O https://curl.se/ca/cacert.pem
         #  && Compress-Archive -Path strava_nim -DestinationPath strava_nim_win_x64.zip
       - name: Copy to Dest (linux/macos)
         if: startsWith(matrix.os, 'windows') != true
