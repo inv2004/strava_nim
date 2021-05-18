@@ -24,7 +24,7 @@ jobs:
         tag_name: rolling
         release_name: Rolling Release
         draft: false
-        prerelease: false
+        prerelease: true
 
   build_release:
     needs: create_release
