@@ -458,14 +458,15 @@ proc getBikeActivities(uid: string, activities: seq[JsonNode]): Future[seq[(stri
         let body3 = await res3.body()
         let j3 = parseJson(body3)
 
+        var file = openAsync("2.json", fmWrite)
+        await file.write(j3.pretty)
+
         let t = j3.getElems().map(x => (x["type"].getStr, x["data"].getElems().map(
                 y => y.getFloat))).toTable
 
         if t["time"].len != t["watts"].len:
             raise newException(MyError, "Streams are not equal len")
 
-        var file = openAsync("2.json", fmWrite)
-        await file.write(j3.pretty)
         file.close()
 
         let actName = j2["name"].getStr() & " " & $j2["distance"].getFloat() & "m " & j2["type"].getStr()
