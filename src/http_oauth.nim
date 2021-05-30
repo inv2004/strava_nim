@@ -5,6 +5,7 @@ import httpclient
 import uri
 import asyncdispatch
 import asynchttpserver
+from nativesockets import AF_INET, AF_INET6
 import asyncfile
 import json
 import sequtils
@@ -33,9 +34,9 @@ type
     MyError* = object of Exception
 
 const
-    # httpHost = "strava-nim.tradesim.org"
-    httpHost = "localhost"
-    httpPort = 8090
+    httpHost = "strava.tradesim.org"
+    # httpHost = "localhost"
+    httpPort = 8080
     #clientId = "438197548914-kp6b5mu5543gdinspvt5tgj0s71q1vbv.apps.googleusercontent.com"
     clientId = "438197548914-rd4afdt82qk0hd9qntp8bg2cd1pprp5v.apps.googleusercontent.com"
     #clientSecret = "F3FV-r9obIVHG3gW6JvDP95m"
@@ -43,7 +44,8 @@ const
     clientScope = @["https://www.googleapis.com/auth/spreadsheets", "email"]
     authorizeUrl = "https://accounts.google.com/o/oauth2/v2/auth"
     accessTokenUrl = "https://accounts.google.com/o/oauth2/token"
-    redirectUri = "http://" & httpHost & ":" & $httpPort
+    # redirectUri = "https://" & httpHost & ":" & $httpPort
+    redirectUri = "https://" & httpHost
     sheetApi = "https://sheets.googleapis.com/v4/spreadsheets"
     userinfoApi = "https://www.googleapis.com/userinfo/v2/me"
     stravaClientId = "18057"
@@ -53,24 +55,31 @@ const
     stravaAccessTokenUrl = "https://www.strava.com/oauth/token"
     stravaApi = "https://www.strava.com/api/v3"
     stravaPageLimit = 50
+    reqTimeout = 5000
+
+proc withTimeoutEx[T](fut: Future[T]): owned(Future[T]) {.async.} =
+    let res = await fut.withTimeout(reqTimeout)
+    if res:
+        return fut.read()
+    else:
+        raise newException(IOError, "Request timeout")
 
 var server = newAsyncHttpServer()
 
 let client = newAsyncHttpClient()
 
 proc email_test(accessToken: string): Future[(string, string)] {.async.} =
-    let res = await client.bearerRequest(userinfoApi, accessToken)
+    let res = await client.bearerRequest(userinfoApi, accessToken).withTimeoutEx()
     let body = await res.body()
 
     let j = parseJson(body)
 
     return (j["id"].getStr, j["email"].getStr)
 
-
 proc sheet_test(sheetId: string, accessToken: string): Future[string] {.async.} =
     let valueRange = "A1:E10"
     let res = await client.bearerRequest(sheetApi & "/" & sheetId & "/values/" &
-            valueRange & "?majorDimension=ROWS", accessToken)
+            valueRange & "?majorDimension=ROWS", accessToken).withTimeoutEx()
     let body = await res.body()
     let j = parseJson(body)
 
@@ -138,7 +147,7 @@ proc http_handler*(req: Request) {.async, gcsafe.} =
             clientSecret,
             redirectUri & "/gcode",
             useBasicAuth = false
-        )
+        ).withTimeoutEx()
         let body = await resp.body()
         let j = parseJson(body)
         debug j
@@ -217,7 +226,7 @@ proc http_handler*(req: Request) {.async, gcsafe.} =
             stravaClientSecret,
             redirectUri & "/sauth?uid=" & params["uid"],
             useBasicAuth = false
-        )
+        ).withTimeoutEx()
         let body = await resp.body()
         let j = parseJson(body)
         debug j
@@ -290,7 +299,7 @@ proc getPlan(uid: string, dt: DateTime): Future[(string, int, seq[string])] {.as
 
     let valueRange = "A:J"
     let res = await client.bearerRequest(sheetApi & "/" & sheetId & "/values/" &
-            valueRange & "?majorDimension=ROWS", accessToken)
+            valueRange & "?majorDimension=ROWS", accessToken).withTimeoutEx()
             # valueRange & "?majorDimension=ROWS&valueRenderOption=FORMULA", accessToken)
     let body = await res.body()
 
@@ -357,7 +366,7 @@ proc setResultValue(uid: string, row: int, col: char, oldText, res: string) {.as
 
     let res = await client.bearerRequest(sheetApi & "/" & sheetId & "/values/" & valueRange & "?valueInputOption=" & valueInputType
             , accessToken,
-            httpMethod = HttpPut, body = $jReq, extraHeaders = headers)
+            httpMethod = HttpPut, body = $jReq, extraHeaders = headers).withTimeoutEx()
 
     let body = await res.body()
 
@@ -377,7 +386,7 @@ proc getKm(activities: seq[JsonNode]): string =
 
 proc getDetailedCalories(uid: string, id: BiggestInt): Future[int] {.async.} =
     let stravaAccessToken = get_store(uid, "strava_access_token")
-    let res = await client.bearerRequest(stravaApi & "/activities/" & $id, stravaAccessToken)
+    let res = await client.bearerRequest(stravaApi & "/activities/" & $id, stravaAccessToken).withTimeoutEx()
     let body = await res.body()
     let j = parseJson(body)
     return j["calories"].getFloat().int
@@ -410,7 +419,7 @@ proc getActivities(uid: string, dt: DateTime, stravaPagesMax: int): Future[seq[J
 
     for page in 1..stravaPagesMax:
         let res = await client.bearerRequest(stravaApi &
-                "/athlete/activities?page=" & $page & "&per_page=" & $stravaPageLimit, stravaAccessToken)
+                "/athlete/activities?page=" & $page & "&per_page=" & $stravaPageLimit, stravaAccessToken).withTimeoutEx()
         let body = await res.body()
         let j = parseJson(body)
 
@@ -449,7 +458,7 @@ proc getBikeActivities(uid: string, activities: seq[JsonNode]): Future[seq[(stri
         let stravaAccessToken = get_store(uid, "strava_access_token")
 
         let res2 = await client.bearerRequest(stravaApi & "/activities/" & $id &
-                "?include_all_efforts=false", stravaAccessToken)
+                "?include_all_efforts=false", stravaAccessToken).withTimeoutEx()
         let body2 = await res2.body()
         let j2 = parseJson(body2)
 
@@ -463,7 +472,7 @@ proc getBikeActivities(uid: string, activities: seq[JsonNode]): Future[seq[(stri
             debug "get: " & stravaApi & "/activities/" & $id & "/streams/time,watts?resolution=high&series_type=time"
 
             let res3 = await client.bearerRequest(stravaApi & "/activities/" & $id &
-                    "/streams/time,watts?resolution=high&series_type=time", stravaAccessToken)
+                    "/streams/time,watts?resolution=high&series_type=time", stravaAccessToken).withTimeoutEx()
             let body3 = await res3.body()
             let j3 = parseJson(body3)
 
@@ -491,10 +500,10 @@ proc refresh_token(uid: string, prefix = ""): Future[string] {.async.} =
         let res =
             if prefix == "":
                 await client.refreshToken(accessTokenUrl, clientId,
-                clientSecret, refreshToken, clientScope, useBasicAuth = false)
+                clientSecret, refreshToken, clientScope, useBasicAuth = false).withTimeoutEx()
             elif prefix == "strava_":
                 await client.refreshToken(stravaAccessTokenUrl, stravaClientId,
-                stravaClientSecret, refreshToken, stravaClientScope, useBasicAuth = false)
+                stravaClientSecret, refreshToken, stravaClientScope, useBasicAuth = false).withTimeoutEx()
             else:
                 raise newException(ValueError, "invalid prefix")
         let body = await res.body()
@@ -517,7 +526,10 @@ proc process_all*(testRun: bool, daysOffset, stravaPagesMax: int) {.async.} =
     let today = now() - initDuration(days = daysOffset)
     for (uid, email) in get_uids():
         empty = false
-        await process(testRun, today, uid, email, stravaPagesMax)
+        try:
+            await process(testRun, today, uid, email, stravaPagesMax)
+        except:
+            error "Error while processing ", email, ": ", getCurrentExceptionMsg()
 
     if empty:
         warn "No records found. Try to run with --reg flag for registration"
@@ -573,4 +585,4 @@ proc process(testRun: bool, today: DateTime, uid, email: string, stravaPagesMax:
 
 proc http*() {.async.} =
     info fmt"Browser to the {redirectUri} for registration"
-    await server.serve(Port(httpPort), http_handler)
+    await server.serve(Port(httpPort), http_handler, address = "127.0.0.1", domain = AF_INET6)

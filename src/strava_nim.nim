@@ -44,7 +44,7 @@ proc print_help() =
     strava_nim --reg   # to start in http mode for registration
 """
 
-when isMainModule:
+proc main() =
     try:
         var http = false
         var daysOffset = 0
@@ -71,3 +71,5 @@ when isMainModule:
     except:
         error "Exception: " & getCurrentExceptionMsg()
 
+when isMainModule:
+    main()
