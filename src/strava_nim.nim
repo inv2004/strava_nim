@@ -1,21 +1,15 @@
-
 import asyncdispatch
 import tables
 import sequtils
 import json
-import times
-import strformat
 import strutils
-import algorithm
 import asyncfile
 import sugar
-import os
 import logging
 import parseopt
 import re
 
 import analytic
-import storage
 import http_oauth
 
 let fmtStr = "[$date $time] - $levelname: "
@@ -47,6 +41,7 @@ proc print_help() =
 proc main() =
     try:
         var http = false
+        var local = false
         var daysOffset = 0
         var stravaPagesMax = 3
         var testRun = false
@@ -57,6 +52,8 @@ proc main() =
                 system.quit()
             elif key == "reg":
                 http = true
+            elif key == "local":
+                local = true
             elif key.match(re"^\d+d$"):
                 daysOffset = parseInt(key[0..^2])
             elif key.match(re"^\d+p$"):
@@ -65,7 +62,7 @@ proc main() =
                 testRun = true
             
         if http:
-            waitFor http()
+            waitFor http(local)
         else:
             waitFor process_all(testRun, daysOffset, stravaPagesMax)
     except:

@@ -4,9 +4,6 @@ import sequtils
 import algorithm
 import re
 import strutils
-import sugar
-import logging
-import math
 
 type
     Interval* = tuple
