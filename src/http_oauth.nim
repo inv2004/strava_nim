@@ -28,14 +28,15 @@ const resultCol = 'I'
 
 const valueInputType = "USER_ENTERED"
 
-const joulesToCal = 4.184
-
 type
-    MyError* = object of Exception
+    MyError* = object of ValueError
+
+var
+    httpHost = "strava.tradesim.org"
+    redirectUri = "https://" & httpHost
 
 const
-    httpHost = "strava.tradesim.org"
-    # httpHost = "localhost"
+    listenAddr = "127.0.0.1"
     httpPort = 8080
     #clientId = "438197548914-kp6b5mu5543gdinspvt5tgj0s71q1vbv.apps.googleusercontent.com"
     clientId = "438197548914-rd4afdt82qk0hd9qntp8bg2cd1pprp5v.apps.googleusercontent.com"
@@ -44,8 +45,6 @@ const
     clientScope = @["https://www.googleapis.com/auth/spreadsheets", "email"]
     authorizeUrl = "https://accounts.google.com/o/oauth2/v2/auth"
     accessTokenUrl = "https://accounts.google.com/o/oauth2/token"
-    # redirectUri = "https://" & httpHost & ":" & $httpPort
-    redirectUri = "https://" & httpHost
     sheetApi = "https://sheets.googleapis.com/v4/spreadsheets"
     userinfoApi = "https://www.googleapis.com/userinfo/v2/me"
     stravaClientId = "18057"
@@ -237,6 +236,7 @@ proc http_handler*(req: Request) {.async, gcsafe.} =
             let exp = (getTime() + initDuration(seconds = j[
                     "expires_in"].getInt)).toUnix()
             upd_store(uid, "strava_expiration", $exp)
+            upd_store(uid, "active", "true")
 
             let athlete = j["athlete"]
             let msg = """
@@ -521,7 +521,18 @@ proc refresh_token(uid: string, prefix = ""): Future[string] {.async.} =
 
     return get_store(uid, prefix & "access_token")
 
+proc mergeRegistered() =
+    loadDB("reg")
+    var newUsers: seq[JsonNode]
+    for v in dbValues():
+        newUsers.add v
+    dbDrop()
+    loadDB("active")
+    merge(newUsers)
+
 proc process_all*(testRun: bool, daysOffset, stravaPagesMax: int) {.async.} =
+    mergeRegistered()
+
     var empty = true
     let today = now() - initDuration(days = daysOffset)
     for (uid, email) in get_uids():
@@ -583,6 +594,12 @@ proc process(testRun: bool, today: DateTime, uid, email: string, stravaPagesMax:
 
     info "done"
 
-proc http*() {.async.} =
+proc http*(local: bool) {.async.} =
+    if local:
+        httpHost = "localhost"
+        redirectUri = "http://" & httpHost & ":" & $httpPort
+        # listenAddr = "0.0.0.0"
+
     info fmt"Browser to the {redirectUri} for registration"
-    await server.serve(Port(httpPort), http_handler, address = "127.0.0.1", domain = AF_INET6)
+    loadDB("reg")
+    await server.serve(Port(httpPort), http_handler, address = listenAddr, domain = AF_INET6)
