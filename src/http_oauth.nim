@@ -236,7 +236,6 @@ proc http_handler*(req: Request) {.async, gcsafe.} =
             let exp = (getTime() + initDuration(seconds = j[
                     "expires_in"].getInt)).toUnix()
             upd_store(uid, "strava_expiration", $exp)
-            upd_store(uid, "active", "true")
 
             let athlete = j["athlete"]
             let msg = """
@@ -245,7 +244,7 @@ Ok<br/>Hello """ & athlete["firstname"].getStr() & " " & athlete[
                     "lastname"].getStr() &
                     """
 <p/>
-<a href="/process?uid=""" & params["uid"] & """">Process The Day</a> just to check that it works (no data will be updated)
+To complete registration <a href="/process?uid=""" & params["uid"] & """">process The Day</a> to check that it works (no data will be updated)
 </HTML>
 """
             await req.respond(Http200, msg, headers)
@@ -260,13 +259,14 @@ Ok<br/>Hello """ & athlete["firstname"].getStr() & " " & athlete[
         try:
             let (plan, _, _) = await getPlan(uid, today)
             let activities = await getActivities(uid, today, 3)
-            let tw = await getBikeActivities(uid, activities)
 
-            if tw.len == 0:
-                raise newException(MyError, "not bike activities found")
+            let res =
+                try:
+                    await getBikeResults(uid, plan, activities)
+                except MyError:
+                    getCurrentExceptionMsg().split("\n")[0]
 
-            let pattern = normalize_plan(plan)
-            let res = pattern.process(tw)
+            upd_store(uid, "active", "true")
 
             let msg = """
     <HTML>
@@ -276,11 +276,11 @@ Ok<br/>Hello """ & athlete["firstname"].getStr() & " " & athlete[
                     """</td></tr>
             <tr><td>Plan:</td><td>""" & plan &
                     """</td></tr>
-            <tr><td>Activity:</td><td>""" & tw[0][0] &
+            <tr><td>Activity:</td><td>""" & plan &
                     """</td></tr>
-            <tr><td>Result:</td><td>""" & $res[1] & """</td></tr>
+            <tr><td>Result:</td><td>""" & $res & """</td></tr>
         </table>
-        Your auth is saved and will be processes automatically
+        Your registration is complete and will be processes automatically every hour
     </HTML>
     """
             await req.respond(Http200, msg, headers)
@@ -530,13 +530,21 @@ proc mergeRegistered() =
     loadDB("active")
     merge(newUsers)
 
+proc stravaOffset(uid: string): int =
+    try:
+        result = get_store(uid, "utc_offset").parseFloat().int
+    except ValueError:
+        discard
+
 proc process_all*(testRun: bool, daysOffset, stravaPagesMax: int) {.async.} =
     mergeRegistered()
 
     var empty = true
+
     let today = now() - initDuration(days = daysOffset)
     for (uid, email) in get_uids():
         empty = false
+
         try:
             await process(testRun, today, uid, email, stravaPagesMax)
         except:
@@ -560,7 +568,11 @@ proc getBikeResults(uid: string, plan: string, activities: seq[JsonNode]): Futur
 proc process(testRun: bool, today: DateTime, uid, email: string, stravaPagesMax: int) {.async.} =
     let fmt = "yyyy-MM-dd"
     let test = if testRun:"testRun" else:""
-    info fmt"Processing {uid} ({email}) for {today.format(fmt)} {test}"
+
+    let stravaOff = stravaOffset(uid)
+    let today = today + stravaOff.seconds
+
+    info fmt"Processing {uid} ({email}) for {today.format(fmt)} ({stravaOff}) {test}"
     let access = await refresh_token(uid)
     let stravaAccess = await refresh_token(uid, "strava_")
     # let today = initDateTime(01, mApr, 2020, 0, 0, 0, utc())
