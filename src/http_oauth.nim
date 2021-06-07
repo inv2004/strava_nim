@@ -130,7 +130,7 @@ proc http_handler*(req: Request) {.async, gcsafe.} =
     <input type="submit" value="check"/>
     <p/>
     How to find it:<br>
-    <a href="https://ibb.co/FJYFcpV"><img src="https://i.ibb.co/jGwSqtR/id.png" alt="id" border="0"></a>
+    <img src="https://i.postimg.cc/3Ryhbydt/3.png" alt="id" border="0">
     <input type="hidden" name="code" value="""" & grantResponse.code & """"/>
 </form></HTML>
 """
