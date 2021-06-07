@@ -55,6 +55,8 @@ const
     stravaApi = "https://www.strava.com/api/v3"
     stravaPageLimit = 50
     reqTimeout = 5000
+    # image = "https://i.postimg.cc/3Ryhbydt/3.png"
+    image = "https://i.ibb.co/NNHnq96/3.png"
 
 proc withTimeoutEx[T](fut: Future[T]): owned(Future[T]) {.async.} =
     let res = await fut.withTimeout(reqTimeout)
@@ -130,7 +132,7 @@ proc http_handler*(req: Request) {.async, gcsafe.} =
     <input type="submit" value="check"/>
     <p/>
     How to find it:<br>
-    <img src="https://i.postimg.cc/3Ryhbydt/3.png" alt="id" border="0">
+    <img src="""" & image & """" alt="id" border="0">
     <input type="hidden" name="code" value="""" & grantResponse.code & """"/>
 </form></HTML>
 """
