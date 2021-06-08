@@ -416,6 +416,8 @@ proc getMovingTime(activities: seq[JsonNode]): string =
 
 
 proc getActivities(uid: string, dt: DateTime, stravaPagesMax: int): Future[seq[JsonNode]] {.async.} =
+    debug "Requesting strava activities"
+
     let stravaAccessToken = get_store(uid, "strava_access_token")
     let today_str = dt.format("YYYY-MM-dd")
 
@@ -493,11 +495,11 @@ proc getBikeActivities(uid: string, activities: seq[JsonNode]): Future[seq[(stri
             result.add @[(actName, newSeq[float](), newSeq[float]())]            
 
 proc refresh_token(uid: string, prefix = ""): Future[string] {.async.} =
-    info "Checking token for " & prefix
+    debug "Checking token for " & prefix
     let exp = get_store(uid, prefix & "expiration").parseInt
     if exp < getTime().toUnix():
         let refreshToken = get_store(uid, prefix & "refresh_token")
-        info "Trying to refresh"
+        info "Trying to refresh token for " & prefix
         let state = generateState()
         let res =
             if prefix == "":
@@ -519,7 +521,7 @@ proc refresh_token(uid: string, prefix = ""): Future[string] {.async.} =
         else:
             raise newException(MyError, "cannot refresh token for " & prefix)
     else:
-        info "Using active token"
+        debug "Using active token"
 
     return get_store(uid, prefix & "access_token")
 
@@ -584,11 +586,12 @@ proc process(testRun: bool, today: DateTime, uid, email: string, stravaPagesMax:
         let activities = await getActivities(uid, today, stravaPagesMax)
 
         let km = getKm(activities)
-        let time = getMovingTime(activities)
-        let kcal = await getKilojoules(uid, activities)
-
         info "    km: ", km
+
+        let time = getMovingTime(activities)
         info "  Time: ", time
+
+        let kcal = await getKilojoules(uid, activities)
         info "  KCal: ", kcal
 
         if not testRun:
