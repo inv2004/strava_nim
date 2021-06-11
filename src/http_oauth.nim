@@ -341,6 +341,18 @@ proc getPlan(uid: string, dt: DateTime): Future[(string, int, seq[string])] {.as
 
     return (currentDay, idx+1, old)
 
+proc getOldText(txt: string): string =
+
+    var lines = txt.split("\n")
+    if lines.len > 0 and lines[0].startsWith("bot: "):
+        lines.delete(0)
+
+    result = lines.join("\n")
+
+    if result.len > 0:
+        if not result.startsWith("  old: "):
+            result = "  old: " & result
+        result = "\n" & result
 
 proc setResultValue(uid: string, row: int, col: char, oldText, res: string) {.async.} =
     if res.len == 0:
@@ -356,7 +368,9 @@ proc setResultValue(uid: string, row: int, col: char, oldText, res: string) {.as
 
     let valueRange = col & $row
 
-    let old = if oldText.len > 0 and col == resultCol: "\n  old: " & oldText else: ""
+    let old =
+        if oldText.len > 0 and col == resultCol: getOldText(oldText)
+        else: ""
 
     let jReq = %*{
         "range": valueRange,
