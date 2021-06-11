@@ -38,21 +38,18 @@ iterator get_uids*(): (string, string) =
   for x in db:
     yield (x["id"].getStr, x["email"].getStr)
 
-iterator dbValues*(): JsonNode =
+iterator dbGetDeleteValues*(): JsonNode =
   for x in db:
     if x["active"].getStr() == "true":
+      let email = x["email"].getStr()
+      if email.len == 0:
+        continue
       delete(x, "_id")
+      db.delete equal("email", email)
       yield x
 
 proc merge*(vals: seq[JsonNode]) =
   for v in vals:
-    if v["active"].getStr() == "true":
-      let email = v["email"].getStr()
-      if email.len == 0:
-        continue
-      info "Upsert into storage: ", email
-      db.upsert(v, equal("email", email))
-    
-proc dbDrop*() =
-  db.drop()
-
+    let email = v["email"].getStr()
+    info "Upsert into storage: ", email
+    db.upsert(v, equal("email", email))
