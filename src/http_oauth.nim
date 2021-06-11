@@ -542,9 +542,8 @@ proc refresh_token(uid: string, prefix = ""): Future[string] {.async.} =
 proc mergeRegistered() =
     loadDB("reg")
     var newUsers: seq[JsonNode]
-    for v in dbValues():
+    for v in dbGetDeleteValues():
         newUsers.add v
-    dbDrop()
     loadDB("active")
     merge(newUsers)
 
