@@ -39,7 +39,7 @@ template defConst(v: untyped) =
     when defined(v):
         const v {.strdefine.}: string = ""
     else:
-        {.error: astToStr(v) & " is not defined in strava_nim.nims".}
+        {.error: astToStr(v) & " is not defined in src/config.nims".}
 
 defConst(clientId)
 defConst(clientSecret)
