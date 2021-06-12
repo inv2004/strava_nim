@@ -35,20 +35,25 @@ var
     httpHost = "strava.tradesim.org"
     redirectUri = "https://" & httpHost
 
+template defConst(v: untyped) =
+    when defined(v):
+        const v {.strdefine.}: string = ""
+    else:
+        {.error: astToStr(v) & " is not defined in strava_nim.nims".}
+
+defConst(clientId)
+defConst(clientSecret)
+defConst(stravaClientId)
+defConst(stravaClientSecret)
+
 const
     listenAddr = "127.0.0.1"
     httpPort = 8080
-    #clientId = "438197548914-kp6b5mu5543gdinspvt5tgj0s71q1vbv.apps.googleusercontent.com"
-    clientId = "438197548914-rd4afdt82qk0hd9qntp8bg2cd1pprp5v.apps.googleusercontent.com"
-    #clientSecret = "F3FV-r9obIVHG3gW6JvDP95m"
-    clientSecret = "cGtgJ69WgFJejypLUzxCoTFA"
     clientScope = @["https://www.googleapis.com/auth/spreadsheets", "email"]
     authorizeUrl = "https://accounts.google.com/o/oauth2/v2/auth"
     accessTokenUrl = "https://accounts.google.com/o/oauth2/token"
     sheetApi = "https://sheets.googleapis.com/v4/spreadsheets"
     userinfoApi = "https://www.googleapis.com/userinfo/v2/me"
-    stravaClientId = "18057"
-    stravaClientSecret = "05e15bf725a7c4ee80fcd6683c8bebd5a5811cef"
     stravaClientScope = @["activity:read_all"]
     stravaAuthorizeUrl = "http://www.strava.com/oauth/authorize"
     stravaAccessTokenUrl = "https://www.strava.com/oauth/token"
