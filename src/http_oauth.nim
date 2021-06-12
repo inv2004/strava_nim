@@ -38,6 +38,8 @@ var
 template defConst(v: untyped) =
     when defined(v):
         const v {.strdefine.}: string = ""
+        when v == "REDEFINEIT":
+            {.error: astToStr(v) & " is not redefined in src/config.nims".}
     else:
         {.error: astToStr(v) & " is not defined in src/config.nims".}
 
