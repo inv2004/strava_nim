@@ -518,7 +518,9 @@ proc getBikeActivities(uid: string, activities: seq[JsonNode]): Future[seq[(stri
 proc refresh_token(uid: string, prefix = ""): Future[string] {.async.} =
     debug "Checking token for " & prefix
     let exp = get_store(uid, prefix & "expiration").parseInt
-    if exp < getTime().toUnix():
+    let now = getTime().toUnix()
+    debug "Expiration: ", exp, "  getTime: ", now, "    (", (exp < now), ")"
+    if exp < now:
         let refreshToken = get_store(uid, prefix & "refresh_token")
         info "Trying to refresh token for " & prefix
         let state = generateState()
@@ -536,8 +538,8 @@ proc refresh_token(uid: string, prefix = ""): Future[string] {.async.} =
 
         if j.contains("access_token") and j.contains("expires_in"):
             upd_store(uid, prefix & "access_token", j["access_token"].getStr)
-            let exp = (getTime() + initDuration(seconds = j[
-                    "expires_in"].getInt)).toUnix()
+            let exp = now + j["expires_in"].getInt
+            debug "Expires_at: ", j["expires_at"], "    in: ", exp
             upd_store(uid, prefix & "expiration", $exp)
         else:
             raise newException(MyError, "cannot refresh token for " & prefix)
