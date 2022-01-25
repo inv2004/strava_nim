@@ -61,10 +61,10 @@ jobs:
       - name: Copy to Dest (linux/macos)
         if: startsWith(matrix.os, 'windows') != true
         run: nimble -d:release build && mkdir -p dist/strava_nim && mv strava_nim dist/strava_nim
-      - uses: papeloto/action-zip@v1
+      - uses: thedoctor0/zip-release@master
         with:
-          files: dist/
-          dest: strava_nim_${{ matrix.os }}.zip
+          filename: strava_nim_${{ matrix.os }}.zip
+          directory: dist/
       - name: Upload Release Asset
         id: upload-release-asset 
         uses: actions/upload-release-asset@v1
