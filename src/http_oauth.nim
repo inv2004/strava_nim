@@ -537,9 +537,8 @@ proc refresh_token(uid: string, prefix = ""): Future[string] {.async.} =
         let j = parseJson(body)
 
         if j.contains("access_token") and j.contains("expires_in"):
-            upd_store(uid, prefix & "access_token", j["access_token"].getStr)
             let exp = now + j["expires_in"].getInt
-            debug "Expires_at: ", j["expires_at"], "    in: ", exp
+            upd_store(uid, prefix & "access_token", j["access_token"].getStr)
             upd_store(uid, prefix & "expiration", $exp)
         else:
             raise newException(MyError, "cannot refresh token for " & prefix)

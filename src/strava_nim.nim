@@ -14,7 +14,7 @@ import http_oauth
 
 let fmtStr = "[$date $time] - $levelname: "
 var consoleLog = newConsoleLogger(fmtStr = fmtStr)
-var rollingLog = newRollingFileLogger("strava_nim.log", fmtStr = fmtStr)
+var rollingLog = newRollingFileLogger("strava_nim.log", mode = fmAppend, fmtStr = fmtStr)
 
 addHandler(consoleLog)
 addHandler(rollingLog)
