@@ -303,7 +303,7 @@ To complete registration <a href="/process?uid=""" & params["uid"] & """">proces
 
 proc getPlan(uid: string, dt: DateTime): Future[(string, int, seq[string])] {.async.} =
     debug "Requesting current plan"
-    let accessToken = get_store(uid, "access_token")
+    let accessToken = await checkRefreshToken(uid)
     let sheetId = get_store(uid, "sheet_id")
 
     let valueRange = "A:J"
@@ -370,7 +370,7 @@ proc setResultValue(uid: string, row: int, col: char, oldText, res: string) {.as
     if newText == oldText:
         return
     
-    let accessToken = get_store(uid, "access_token")
+    let accessToken = await checkRefreshToken(uid)
     let sheetId = get_store(uid, "sheet_id")
 
     let valueRange = col & $row
@@ -408,7 +408,7 @@ proc getKm(activities: seq[JsonNode]): string =
             result = "=" & a.join("+")
 
 proc getDetailedCalories(uid: string, id: BiggestInt): Future[int] {.async.} =
-    let stravaAccessToken = get_store(uid, "strava_access_token")
+    let stravaAccessToken = await checkRefreshToken(uid, "strava_")
     let res = await client.bearerRequest(stravaApi & "/activities/" & $id, stravaAccessToken).withTimeoutEx()
     let body = await res.body()
     let j = parseJson(body)
@@ -439,7 +439,7 @@ proc getMovingTime(activities: seq[JsonNode]): string =
 proc getActivities(uid: string, dt: DateTime, stravaPagesMax: int): Future[seq[JsonNode]] {.async.} =
     debug "Requesting strava activities"
 
-    let stravaAccessToken = get_store(uid, "strava_access_token")
+    let stravaAccessToken = await checkRefreshToken(uid, "strava_")
     let today_str = dt.format("YYYY-MM-dd")
 
     for page in 1..stravaPagesMax:
@@ -480,7 +480,7 @@ proc getBikeActivities(uid: string, activities: seq[JsonNode]): Future[seq[(stri
 
         debug "get: " & stravaApi & "/activities/" & $id & "?include_all_efforts=false"
 
-        let stravaAccessToken = get_store(uid, "strava_access_token")
+        let stravaAccessToken = await checkRefreshToken(uid, "strava_")
 
         let res2 = await client.bearerRequest(stravaApi & "/activities/" & $id &
                 "?include_all_efforts=false", stravaAccessToken).withTimeoutEx()
@@ -515,7 +515,7 @@ proc getBikeActivities(uid: string, activities: seq[JsonNode]): Future[seq[(stri
         else:
             result.add @[(actName, newSeq[float](), newSeq[float]())]            
 
-proc refresh_token(uid: string, prefix = ""): Future[string] {.async.} =
+proc checkRefreshToken(uid: string, prefix = ""): Future[string] {.async.} =
     debug "Checking token for " & prefix
     let exp = get_store(uid, prefix & "expiration").parseInt
     let now = getTime().toUnix()
@@ -523,7 +523,6 @@ proc refresh_token(uid: string, prefix = ""): Future[string] {.async.} =
     if exp < now:
         let refreshToken = get_store(uid, prefix & "refresh_token")
         info "Trying to refresh token for " & prefix
-        let state = generateState()
         let res =
             if prefix == "":
                 await client.refreshToken(accessTokenUrl, clientId,
@@ -540,6 +539,7 @@ proc refresh_token(uid: string, prefix = ""): Future[string] {.async.} =
             let exp = now + j["expires_in"].getInt
             upd_store(uid, prefix & "access_token", j["access_token"].getStr)
             upd_store(uid, prefix & "expiration", $exp)
+            info "Done. Next expiration: ", exp
         else:
             raise newException(MyError, "cannot refresh token for " & prefix)
     else:
@@ -598,8 +598,6 @@ proc process(testRun: bool, today: DateTime, uid, email: string, stravaPagesMax:
     let today = today + stravaOff.seconds
 
     info fmt"Processing {uid} ({email}) for {today.format(fmt)} ({stravaOff}) {test}"
-    let access = await refresh_token(uid)
-    let stravaAccess = await refresh_token(uid, "strava_")
     # let today = initDateTime(01, mApr, 2020, 0, 0, 0, utc())
 
     try:
