@@ -520,7 +520,7 @@ proc checkRefreshToken(uid: string, prefix = ""): Future[string] {.async.} =
     let exp = get_store(uid, prefix & "expiration").parseInt
     let now = getTime().toUnix()
     debug "Expiration: ", exp, "  getTime: ", now, "    (", (exp < now), ")"
-    if exp < now:
+    if exp-1 < now:
         let refreshToken = get_store(uid, prefix & "refresh_token")
         info "Trying to refresh token for " & prefix
         let res =
@@ -561,7 +561,7 @@ proc stravaOffset(uid: string): int =
     except ValueError:
         discard
 
-proc process_all*(testRun: bool, daysOffset, stravaPagesMax: int) {.async.} =
+proc process_all*(testRun: bool, daysOffset, stravaPagesMax: int, pattern: string) {.async.} =
     mergeRegistered()
 
     var empty = true
@@ -569,7 +569,8 @@ proc process_all*(testRun: bool, daysOffset, stravaPagesMax: int) {.async.} =
     let today = now() - initDuration(days = daysOffset)
     for (uid, email) in get_uids():
         empty = false
-
+        if pattern notin email:
+            continue
         try:
             await process(testRun, today, uid, email, stravaPagesMax)
         except:

@@ -26,7 +26,8 @@ proc `$`*(a: Interval): string =
     let d1 = initDuration(seconds = a.start).toParts()
     let d2 = initDuration(seconds = a.stop).toParts()
     let d3 = initDuration(seconds = a.duration().int).toParts()
-    fmt"(avg: {a.avg:0.1f}, start: {d1[Minutes]:02}:{d1[Seconds]:02}, duration: {d3[Minutes]:02}:{d3[Seconds]:02}, stop:{d2[Minutes]:02}:{d2[Seconds]:02})"
+    let work = a.avg * float(a.stop - a.start)
+    fmt"(avg: {a.avg:0.1f}, start: {d1[Minutes]:02}:{d1[Seconds]:02}, duration: {d3[Minutes]:02}:{d3[Seconds]:02}, stop:{d2[Minutes]:02}:{d2[Seconds]:02}, work:{work})"
 
 proc `$`*(d: times.Duration): string =
     let d = d.toParts()
@@ -269,7 +270,12 @@ proc process*(pattern: seq[Pattern], tw: seq[(string, seq[float], seq[float])]):
         ret_val -= j
 
     when not defined(release):
-        trace "SOLU: ", solution.mapIt(it[2])
+        # trace "SOLU: ", solution.mapIt(it[2])
+        var totalWork = 0.0
+        for s in solution:
+            trace "SOLU:", s
+            totalWork += s.avg * float(s.stop - s.start)
+        trace "TOTA: ", totalWork
 
     return (ret_val, solution)
 
