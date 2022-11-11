@@ -16,3 +16,6 @@ requires "oauth >= 0.8"
 # requires "lmdb >= 0.1.2"
 requires "flatdb >= 0.2.4"
 requires "asciigraph >= 0.1.2"
+
+task static, "static":
+  exec "nim musl -d:pcre -d:openssl src/strava_nim.nim"

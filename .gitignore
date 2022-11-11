@@ -10,3 +10,8 @@ tests/tester.exe
 src/analytic.exe
 strava_nim.log
 1.json
+*.tar.*
+openssl/
+openssl-*/
+pcre/
+pcre-*/
