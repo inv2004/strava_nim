@@ -13,8 +13,9 @@ The draft version is able to:
 - [x] Process for all stored users
 
 ### Build
+For muls static
 ```shell
-nimble.exe -d:ssl -d:release build
+nimble.exe static
 ```
 
 ### First run
