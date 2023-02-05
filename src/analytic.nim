@@ -62,14 +62,24 @@ proc normSeconds(x: string): float =
   (m * parseInt(s)).float
 
 proc normalize_plan*(plan: string): seq[Pattern] =
-  for x in plan.findAll(re"(\d+x\d+x(\d+[smh]?|\(\d+[smh]?/\d+\))|\d+x(\d+[smh]?|\(\d+[smh]?/\d+\)))"):
+  for x in plan.findAll(re"(\d+(x|х)\d+(x|х)(\d+[smh]?|\(\d+[smh]?/\d+\))|\d+(x|х)(\d+[smh]?|\(\d+[smh]?/\d+\)))"):
     let vals = x.split('x')
     if vals.len == 3:
       let pattern: Pattern = (vals[1].parseInt, vals[2].normSeconds)
       result.add repeat(pattern, vals[0].parseInt)
-    else:
+    elif vals.len == 2:
       let pattern: Pattern = (vals[0].parseInt, vals[1].normSeconds)
       result.add pattern
+    else:
+      let vals = x.split("х") # TODO: copy
+      if vals.len == 3:
+        let pattern: Pattern = (vals[1].parseInt, vals[2].normSeconds)
+        result.add repeat(pattern, vals[0].parseInt)
+      elif vals.len == 2:
+        let pattern: Pattern = (vals[0].parseInt, vals[1].normSeconds)
+        result.add pattern
+      else:
+        error "cannot parse plan: ", plan
 
 proc fmt_duration(x: float): string =
   let x = x.int
@@ -310,11 +320,11 @@ when isMainModule:
   import sugar
   import tables
 
-  let t = readFile("../issue1/3a.json").parseJson().getElems().map(x => (x["type"].getStr, x["data"].getElems().map(y => y.getFloat))).toTable
-  doAssert t["time"].len == t["watts"].len
-  let t2 = readFile("../issue1/3.json").parseJson().getElems().map(x => (x["type"].getStr, x["data"].getElems().map(y => y.getFloat))).toTable
-  doAssert t2["time"].len == t2["watts"].len
-  echo "5x5 10x5s".normalize_plan().process(@[("3a", t["time"], t["watts"]), ("3", t2["time"], t2["watts"])])
+  let plan = readFile("1.1")
+  # let t = readFile("3_1.json").parseJson().getElems().map(x => (x["type"].getStr, x["data"].getElems().map(y => y.getFloat))).toTable
+  # doAssert t["time"].len == t["watts"].len
+  echo plan.normalize_plan()
+  # echo "3x14 (240)".normalize_plan().process(@[("3a", t["time"], t["watts"])])
 
   # let tt = @[0.0,1,2,3,4,5,6,7,8,9]
   # let ww = @[100.0, 100, 100, 100, 100, 100, 100, 100, 100, 100]
