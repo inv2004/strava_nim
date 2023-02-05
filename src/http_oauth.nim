@@ -107,206 +107,207 @@ proc parseQuery(query: string): TableRef[string, string] =
     let fd = response.find("=")
     result[response[0..fd-1]] = response[fd+1..len(response)-1].decodeUrl()
 
-proc http_handler*(req: Request) {.async, gcsafe.} =
-  var headers = newHttpHeaders([("Cache-Control", "no-cache")])
-  headers["Content-Type"] = "text/html; charset=utf-8"
+proc http_handler*(req: Request) {.async,gcsafe.} =
+  {.cast(gcsafe).}:   # TODO: not safe
+    var headers = newHttpHeaders([("Cache-Control", "no-cache")])
+    headers["Content-Type"] = "text/html; charset=utf-8"
 
-  if req.url.path == "/":
-    let msg = """
-<HTML>Click here to start authorisation <a href="/gauth">Google Auth</a></HTML>
-"""
-    await req.respond(Http200, msg, headers)
-  elif req.url.path == "/gauth":
-    let state = generateState()
-    let grantUrl = getAuthorizationCodeGrantUrl(
-        authorizeUrl,
-        clientId,
-        redirectUri & "/gcode",
-        state,
-        clientScope,
-        accessType = "offline"
-    )
-    headers["Location"] = grantUrl
-    await req.respond(Http301, "", headers)
-  elif req.url.path == "/gcode":
-    let grantResponse = req.url.parseAuthorizationResponse()
+    if req.url.path == "/":
+      let msg = """
+  <HTML>Click here to start authorisation <a href="/gauth">Google Auth</a></HTML>
+  """
+      await req.respond(Http200, msg, headers)
+    elif req.url.path == "/gauth":
+      let state = generateState()
+      let grantUrl = getAuthorizationCodeGrantUrl(
+          authorizeUrl,
+          clientId,
+          redirectUri & "/gcode",
+          state,
+          clientScope,
+          accessType = "offline"
+      )
+      headers["Location"] = grantUrl
+      await req.respond(Http301, "", headers)
+    elif req.url.path == "/gcode":
+      let grantResponse = req.url.parseAuthorizationResponse()
 
-    # echo "Code is " & grantResponse.code
+      # echo "Code is " & grantResponse.code
 
-    let sheetId = ""
+      let sheetId = ""
 
-    let msg = """
-<HTML><form action="/check_sheet">spreadsheet id:
-    <input type="text" name="sheet_id" value="""" & sheetId &
-            """" size="60"/><br>
-    <input type="submit" value="check"/>
-    <p/>
-    How to find it:<br>
-    <img src="""" & image &
-                    """" alt="id" border="0">
-    <input type="hidden" name="code" value="""" & grantResponse.code & """"/>
-</form></HTML>
-"""
-    await req.respond(Http200, msg, headers)
-  elif req.url.path == "/check_sheet":
-    let params = req.url.query.parseQuery()
-    let code = decodeUrl(params["code"])
+      let msg = """
+  <HTML><form action="/check_sheet">spreadsheet id:
+      <input type="text" name="sheet_id" value="""" & sheetId &
+              """" size="60"/><br>
+      <input type="submit" value="check"/>
+      <p/>
+      How to find it:<br>
+      <img src="""" & image &
+                      """" alt="id" border="0">
+      <input type="hidden" name="code" value="""" & grantResponse.code & """"/>
+  </form></HTML>
+  """
+      await req.respond(Http200, msg, headers)
+    elif req.url.path == "/check_sheet":
+      let params = req.url.query.parseQuery()
+      let code = decodeUrl(params["code"])
 
-    let resp = await client.getAuthorizationCodeAccessToken(
-        accessTokenUrl,
-        code,
-        clientId,
-        clientSecret,
-        redirectUri & "/gcode",
-        useBasicAuth = false
-    ).withTimeoutEx()
-    let body = await resp.body()
-    let j = parseJson(body)
-    debug j
+      let resp = await client.getAuthorizationCodeAccessToken(
+          accessTokenUrl,
+          code,
+          clientId,
+          clientSecret,
+          redirectUri & "/gcode",
+          useBasicAuth = false
+      ).withTimeoutEx()
+      let body = await resp.body()
+      let j = parseJson(body)
+      debug j
 
-    if j.contains("error"):
-      await req.respond(Http200, """
-<HTML>There is an error from google OAuth.<br>
-    <p/>
-    Please try again <a href="/">Restart</a><br>
-""", headers)
-      return
-
-    if not j.contains("access_token"): raise newException(MyError, "No access_token found from google")
-    if not j.contains("expires_in"): raise newException(MyError, "No expires_in found from google")
-
-    let accessToken = j["access_token"].getStr()
-
-    let profile = await email_test(accessToken)
-    let uid = profile[0]
-      # let email = profile[1]
-
-    if not j.contains("refresh_token"):
-      try:
-        let rt = get_store(uid, "refresh_token")
-        await req.respond(Http200,
-                """
-<HTML>No refresh_token found in google response.<br>
-    But we have stored one. Looks like you are already registered.
-    <p/>
-    If you want, please continue to strava authorization <a href="/strava?uid=""" &
-                uid & """">Strava Auth</a><br>
-""", headers)
-        return
-      except:
-        await req.respond(Http200,
-                """
-<HTML>No refresh_token found in google response<br>
-    Please remove strava-nim permissions from <a href="https://myaccount.google.com/u/0/permissions">https://myaccount.google.com/u/0/permissions</a><br>
-    and then try again: <a href="/">Restart</a></HTML>
-""", headers)
+      if j.contains("error"):
+        await req.respond(Http200, """
+  <HTML>There is an error from google OAuth.<br>
+      <p/>
+      Please try again <a href="/">Restart</a><br>
+  """, headers)
         return
 
-    store(profile, accessToken)
-    upd_store(uid, "refresh_token", j["refresh_token"].getStr)
-    let exp = (getTime() + initDuration(seconds = j[
-            "expires_in"].getInt)).toUnix()
-    upd_store(uid, "expiration", $exp)
-    upd_store(uid, "sheet_id", params["sheet_id"])
+      if not j.contains("access_token"): raise newException(MyError, "No access_token found from google")
+      if not j.contains("expires_in"): raise newException(MyError, "No expires_in found from google")
 
-    let res2 = await sheet_test(params["sheet_id"], accessToken)
-    let msg = """
-<HTML>Ok:<br/>""" & res2 & """
-<p/>
-<a href="/strava?uid=""" & uid & """">Strava Auth</a>
-</HTML>
-"""
-    await req.respond(Http200, msg, headers)
-  elif req.url.path == "/strava":
-    let params = req.url.query.parseQuery()
-    let state = generateState()
-    let grantUrl = getAuthorizationCodeGrantUrl(
-        stravaAuthorizeUrl,
-        stravaClientId,
-        redirectUri & "/sauth?uid=" & params["uid"],
-        state,
-        stravaClientScope,
-        accessType = "offline"
-    )
-    headers["Location"] = grantUrl
-    await req.respond(Http301, "", headers)
-  elif req.url.path == "/sauth":
-    let params = req.url.query.parseQuery()
-    let uid = params["uid"]
-    # echo $params
-    let resp = await client.getAuthorizationCodeAccessToken(
-        stravaAccessTokenUrl,
-        params["code"],
-        stravaClientId,
-        stravaClientSecret,
-        redirectUri & "/sauth?uid=" & params["uid"],
-        useBasicAuth = false
-    ).withTimeoutEx()
-    let body = await resp.body()
-    let j = parseJson(body)
-    debug j
-    if j.contains("access_token") and j.contains("refresh_token") and
-            j.contains("expires_in"):
-      upd_store(uid, "strava_access_token", j["access_token"].getStr)
-      upd_store(uid, "strava_refresh_token", j["refresh_token"].getStr)
+      let accessToken = j["access_token"].getStr()
+
+      let profile = await email_test(accessToken)
+      let uid = profile[0]
+        # let email = profile[1]
+
+      if not j.contains("refresh_token"):
+        try:
+          let rt = get_store(uid, "refresh_token")
+          await req.respond(Http200,
+                  """
+  <HTML>No refresh_token found in google response.<br>
+      But we have stored one. Looks like you are already registered.
+      <p/>
+      If you want, please continue to strava authorization <a href="/strava?uid=""" &
+                  uid & """">Strava Auth</a><br>
+  """, headers)
+          return
+        except:
+          await req.respond(Http200,
+                  """
+  <HTML>No refresh_token found in google response<br>
+      Please remove strava-nim permissions from <a href="https://myaccount.google.com/u/0/permissions">https://myaccount.google.com/u/0/permissions</a><br>
+      and then try again: <a href="/">Restart</a></HTML>
+  """, headers)
+          return
+
+      store(profile, accessToken)
+      upd_store(uid, "refresh_token", j["refresh_token"].getStr)
       let exp = (getTime() + initDuration(seconds = j[
               "expires_in"].getInt)).toUnix()
-      upd_store(uid, "strava_expiration", $exp)
+      upd_store(uid, "expiration", $exp)
+      upd_store(uid, "sheet_id", params["sheet_id"])
 
-      let athlete = j["athlete"]
+      let res2 = await sheet_test(params["sheet_id"], accessToken)
       let msg = """
-<HTML>
-Ok<br/>Hello """ & athlete["firstname"].getStr() & " " & athlete[
-              "lastname"].getStr() &
-              """
-<p/>
-To complete registration <a href="/process?uid=""" & params["uid"] & """">process The Day</a> to check that it works (no data will be updated)
-</HTML>
-"""
+  <HTML>Ok:<br/>""" & res2 & """
+  <p/>
+  <a href="/strava?uid=""" & uid & """">Strava Auth</a>
+  </HTML>
+  """
       await req.respond(Http200, msg, headers)
+    elif req.url.path == "/strava":
+      let params = req.url.query.parseQuery()
+      let state = generateState()
+      let grantUrl = getAuthorizationCodeGrantUrl(
+          stravaAuthorizeUrl,
+          stravaClientId,
+          redirectUri & "/sauth?uid=" & params["uid"],
+          state,
+          stravaClientScope,
+          accessType = "offline"
+      )
+      headers["Location"] = grantUrl
+      await req.respond(Http301, "", headers)
+    elif req.url.path == "/sauth":
+      let params = req.url.query.parseQuery()
+      let uid = params["uid"]
+      # echo $params
+      let resp = await client.getAuthorizationCodeAccessToken(
+          stravaAccessTokenUrl,
+          params["code"],
+          stravaClientId,
+          stravaClientSecret,
+          redirectUri & "/sauth?uid=" & params["uid"],
+          useBasicAuth = false
+      ).withTimeoutEx()
+      let body = await resp.body()
+      let j = parseJson(body)
+      debug j
+      if j.contains("access_token") and j.contains("refresh_token") and
+              j.contains("expires_in"):
+        upd_store(uid, "strava_access_token", j["access_token"].getStr)
+        upd_store(uid, "strava_refresh_token", j["refresh_token"].getStr)
+        let exp = (getTime() + initDuration(seconds = j[
+                "expires_in"].getInt)).toUnix()
+        upd_store(uid, "strava_expiration", $exp)
+
+        let athlete = j["athlete"]
+        let msg = """
+  <HTML>
+  Ok<br/>Hello """ & athlete["firstname"].getStr() & " " & athlete[
+                "lastname"].getStr() &
+                """
+  <p/>
+  To complete registration <a href="/process?uid=""" & params["uid"] & """">process The Day</a> to check that it works (no data will be updated)
+  </HTML>
+  """
+        await req.respond(Http200, msg, headers)
+      else:
+        await req.respond(Http200, "<HTML>Error. <a href=\"/\">Restart</a></HTML>", headers)
+    elif req.url.path == "/process":
+      let params = req.url.query.parseQuery()
+      let uid = params["uid"]
+
+      let today = now() ## TODO: duplicate of process function
+
+      try:
+        let (plan, _, _) = await getPlan(uid, today)
+        let activities = await getActivities(uid, today, 3)
+
+        let res =
+          try:
+            await getBikeResults(uid, plan, activities)
+          except MyError:
+            getCurrentExceptionMsg().split("\n")[0]
+
+        upd_store(uid, "active", "true")
+
+        let msg = """
+      <HTML>
+          Example:
+          <table border=3>
+              <tr><td>Today:</td><td>""" & today.format("YYYY-MM-dd") &
+                """</td></tr>
+              <tr><td>Plan:</td><td>""" & plan &
+                """</td></tr>
+              <tr><td>Activity:</td><td>""" & plan &
+                """</td></tr>
+              <tr><td>Result:</td><td>""" & $res & """</td></tr>
+          </table>
+          Your registration is complete and will be processes automatically every hour
+      </HTML>
+      """
+        await req.respond(Http200, msg, headers)
+      except MyError:
+        let msg = getCurrentExceptionMsg()
+        warn msg
+        await req.respond(Http200, "Exception: " & msg, headers)
+
     else:
-      await req.respond(Http200, "<HTML>Error. <a href=\"/\">Restart</a></HTML>", headers)
-  elif req.url.path == "/process":
-    let params = req.url.query.parseQuery()
-    let uid = params["uid"]
-
-    let today = now() ## TODO: duplicate of process function
-
-    try:
-      let (plan, _, _) = await getPlan(uid, today)
-      let activities = await getActivities(uid, today, 3)
-
-      let res =
-        try:
-          await getBikeResults(uid, plan, activities)
-        except MyError:
-          getCurrentExceptionMsg().split("\n")[0]
-
-      upd_store(uid, "active", "true")
-
-      let msg = """
-    <HTML>
-        Example:
-        <table border=3>
-            <tr><td>Today:</td><td>""" & today.format("YYYY-MM-dd") &
-              """</td></tr>
-            <tr><td>Plan:</td><td>""" & plan &
-              """</td></tr>
-            <tr><td>Activity:</td><td>""" & plan &
-              """</td></tr>
-            <tr><td>Result:</td><td>""" & $res & """</td></tr>
-        </table>
-        Your registration is complete and will be processes automatically every hour
-    </HTML>
-    """
-      await req.respond(Http200, msg, headers)
-    except MyError:
-      let msg = getCurrentExceptionMsg()
-      warn msg
-      await req.respond(Http200, "Exception: " & msg, headers)
-
-  else:
-    await req.respond(Http404, "Not Found")
+      await req.respond(Http404, "Not Found")
 
 proc getPlan(uid: string, dt: DateTime): Future[(string, int, seq[
         string])] {.async.} =
