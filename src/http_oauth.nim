@@ -487,7 +487,7 @@ proc getActivities(uid: string, dt: DateTime, stravaPagesMax: int): Future[seq[
 
 proc getBikeActivities(uid: string, activities: seq[JsonNode]): Future[seq[(
         string, seq[float], seq[float])]] {.async.} =
-  let foundActivities = activities.filterIt(it["type"].getStr().endsWith("Ride")).sortedByIt(it["id"])
+  let foundActivities = activities.filterIt(it["type"].getStr().endsWith("Ride")).sortedByIt(it["id"].getInt())
 
   if foundActivities.len == 0:
     raise newException(MyError, "No Ride records found in strava")
