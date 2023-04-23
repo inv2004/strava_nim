@@ -30,7 +30,7 @@ proc store*(profile: (string, string), accessToken: string) =
 
 # TODO: refactoring
 proc upd_store*(id: string, key: string, value: string) {.gcsafe.} =
-  {.cast(gcsafe),locks: [dbLock].}:
+  {.locks: [dbLock].}:
     let entry = db.queryOne equal("id", id)
     let db_id = entry["_id"].getStr
     db[db_id][key] = newJString(value)

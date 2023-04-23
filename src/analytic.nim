@@ -62,24 +62,15 @@ proc normSeconds(x: string): float =
   (m * parseInt(s)).float
 
 proc normalize_plan*(plan: string): seq[Pattern] =
-  for x in plan.findAll(re"(\d+(x|х)\d+(x|х)(\d+[smh]?|\(\d+[smh]?/\d+\))|\d+(x|х)(\d+[smh]?|\(\d+[smh]?/\d+\)))"):
+  let normPlan = plan.replace("х", "x")
+  for x in normPlan.findAll(re"(\d+x\d+x(\d+[smh]?|\(\d+[smh]?/\d+\))|\d+x(\d+[smh]?|\(\d+[smh]?/\d+\)))"):
     let vals = x.split('x')
     if vals.len == 3:
       let pattern: Pattern = (vals[1].parseInt, vals[2].normSeconds)
       result.add repeat(pattern, vals[0].parseInt)
-    elif vals.len == 2:
+    else:
       let pattern: Pattern = (vals[0].parseInt, vals[1].normSeconds)
       result.add pattern
-    else:
-      let vals = x.split("х") # TODO: copy
-      if vals.len == 3:
-        let pattern: Pattern = (vals[1].parseInt, vals[2].normSeconds)
-        result.add repeat(pattern, vals[0].parseInt)
-      elif vals.len == 2:
-        let pattern: Pattern = (vals[0].parseInt, vals[1].normSeconds)
-        result.add pattern
-      else:
-        error "cannot parse plan: ", plan
 
 proc fmt_duration(x: float): string =
   let x = x.int
@@ -320,9 +311,10 @@ when isMainModule:
   import sugar
   import tables
 
-  let plan = readFile("1.1")
+  # let plan = readFile("1.1")
   # let t = readFile("3_1.json").parseJson().getElems().map(x => (x["type"].getStr, x["data"].getElems().map(y => y.getFloat))).toTable
   # doAssert t["time"].len == t["watts"].len
+  let plan = "1x20 (230) + 5x2 (360, otdyh 5 min) + 1x2 + 1x5 + 10x15s + 1x2 + 1x5 + 10x15s    row: 2328    old: 662:071540bot: 1x20 (230) + 6x2 (359 361 347 349 234 278) + 1x5 (275) + 10x15s (506 564 522 438 539 565 499 528 500 483) + 1x2 (355) + 1x5 (232) + 10x15s (512 475 533 513 546 514 499 422 506 622)"
   echo plan.normalize_plan()
   # echo "3x14 (240)".normalize_plan().process(@[("3a", t["time"], t["watts"])])
 
