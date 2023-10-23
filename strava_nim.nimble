@@ -18,4 +18,4 @@ requires "flatdb >= 0.2.4"
 requires "asciigraph >= 0.1.2"
 
 task static, "static":
-  exec "nim musl -d:pcre -d:openssl src/strava_nim.nim"
+  exec "nim musl -d:pcre -d:openssl --mm:refc --threads:off src/strava_nim.nim"

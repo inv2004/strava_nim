@@ -25,16 +25,13 @@ import analytic
 const kmCol = 'F'
 const mTimeCol = 'G'
 const kCalCol = 'H'
-const resultCol = 'I'
+const indoorCol = 'I'
+const resultCol = 'J'
 
 const valueInputType = "USER_ENTERED"
 
 type
   MyError* = object of ValueError
-
-var
-  httpHost = "strava.tradesim.org"
-  redirectUri = "https://" & httpHost
 
 template defConst(v: untyped) =
   when defined(v):
@@ -50,6 +47,7 @@ defConst(stravaClientId)
 defConst(stravaClientSecret)
 
 const
+  defaultHttpHost = "strava.tradesim.org"
   listenAddr = "127.0.0.1"
   httpPort = 8080
   clientScope = @["https://www.googleapis.com/auth/spreadsheets", "email"]
@@ -66,6 +64,10 @@ const
   # image = "https://i.postimg.cc/3Ryhbydt/3.png"
   image = "https://i.ibb.co/NNHnq96/3.png"
 
+var redirectUri {.threadvar.}: string
+var server = newAsyncHttpServer()
+var client {.threadvar.}: AsyncHttpClient
+
 proc withTimeoutEx[T](fut: Future[T]): owned(Future[T]) {.async.} =
   let res = await fut.withTimeout(reqTimeout)
   if res:
@@ -73,9 +75,6 @@ proc withTimeoutEx[T](fut: Future[T]): owned(Future[T]) {.async.} =
   else:
     raise newException(IOError, "Request timeout")
 
-var server = newAsyncHttpServer()
-
-let client = newAsyncHttpClient()
 
 proc email_test(accessToken: string): Future[(string, string)] {.async.} =
   let res = await client.bearerRequest(userinfoApi,
@@ -107,7 +106,7 @@ proc parseQuery(query: string): TableRef[string, string] =
     let fd = response.find("=")
     result[response[0..fd-1]] = response[fd+1..len(response)-1].decodeUrl()
 
-proc http_handler*(req: Request) {.async,gcsafe.} =
+proc http_handler*(req: Request) {.async, gcsafe.} =
   var headers = newHttpHeaders([("Cache-Control", "no-cache")])
   headers["Content-Type"] = "text/html; charset=utf-8"
 
@@ -317,7 +316,6 @@ proc getPlan(uid: string, dt: DateTime): Future[(string, int, seq[
   let valueRange = "A:J"
   let res = await client.bearerRequest(sheetApi & "/" & sheetId & "/values/" &
           valueRange & "?majorDimension=ROWS", accessToken).withTimeoutEx()
-    # valueRange & "?majorDimension=ROWS&valueRenderOption=FORMULA", accessToken)
   let body = await res.body()
 
   let j = parseJson(body)
@@ -341,7 +339,9 @@ proc getPlan(uid: string, dt: DateTime): Future[(string, int, seq[
 
   debug "Current day found in plan"
 
-  let currentDay = elems[idx][4].getStr
+  let currentDay =
+    if elems[idx].len >= 4: elems[idx][4].getStr
+    else: ""
 
   var old = newSeq[string]()
 
@@ -349,6 +349,7 @@ proc getPlan(uid: string, dt: DateTime): Future[(string, int, seq[
   old.add elems[idx]{6}.getStr()
   old.add elems[idx]{7}.getStr()
   old.add elems[idx]{8}.getStr()
+  old.add elems[idx]{9}.getStr()
 
   let idx2 = idx + 1
 
@@ -450,6 +451,9 @@ proc getMovingTime(activities: seq[JsonNode]): string =
   let dp = initDuration(minutes = minutes.int64).toParts()
   return fmt"{dp[Hours]}:{dp[Minutes]:02d}"
 
+proc isIndoorRide(activities: seq[JsonNode]): string =
+  if activities.anyIt(it{"type"}.getStr().startsWith("Virtual")):
+    return "X"
 
 proc getActivities(uid: string, dt: DateTime, stravaPagesMax: int): Future[seq[
         JsonNode]] {.async.} =
@@ -487,7 +491,8 @@ proc getActivities(uid: string, dt: DateTime, stravaPagesMax: int): Future[seq[
 
 proc getBikeActivities(uid: string, activities: seq[JsonNode]): Future[seq[(
         string, seq[float], seq[float])]] {.async.} =
-  let foundActivities = activities.filterIt(it["type"].getStr().endsWith("Ride")).sortedByIt(it["id"].getInt())
+  let foundActivities = activities.filterIt(it["type"].getStr().endsWith(
+      "Ride")).sortedByIt(it["id"].getInt())
 
   if foundActivities.len == 0:
     raise newException(MyError, "No Ride records found in strava")
@@ -558,7 +563,12 @@ proc checkRefreshToken(uid: string, prefix = ""): Future[string] {.async.} =
             else:
                 raise newException(ValueError, "invalid prefix")
     let body = await res.body()
-    let j = parseJson(body)
+
+    let j =
+      try:
+        parseJson(body)
+      except:
+        raise newException(MyError, "Invalid response: " & body)
 
     if j.contains("access_token") and j.contains("expires_in"):
       let exp = now + j["expires_in"].getInt
@@ -585,26 +595,6 @@ proc stravaOffset(uid: string): int =
     result = get_store(uid, "utc_offset").parseFloat().int
   except ValueError:
     discard
-
-proc process_all*(testRun: bool, daysOffset, stravaPagesMax: int,
-        pattern: string) {.async.} =
-  mergeRegistered()
-
-  var empty = true
-
-  let today = now() - initDuration(days = daysOffset)
-  for (uid, email) in get_uids():
-    empty = false
-    if pattern notin email:
-      continue
-    try:
-      await process(testRun, today, uid, email, stravaPagesMax)
-    except:
-      error "Error while processing ", email, ": ",
-              getCurrentExceptionMsg()
-
-  if empty:
-    warn "No records found. Try to run with --reg flag for registration"
 
 proc getBikeResults(uid: string, plan: string, activities: seq[
         JsonNode]): Future[string] {.async.} =
@@ -643,17 +633,21 @@ proc process(testRun: bool, today: DateTime, uid, email: string,
     let kcal = await getKilojoules(uid, activities)
     info "  KCal: ", kcal
 
+    let isIndoor = isIndoorRide(activities)
+    info "  Indoor: ", isIndoor
+
     if not testRun:
       await setResultValue(uid, row, kmCol, old[0], km)
       await setResultValue(uid, row, mTimeCol, old[1], time)
       await setResultValue(uid, row, kCalCol, old[2], kcal)
+      await setResultValue(uid, row, indoorCol, old[3], isIndoor)
 
     let res = await getBikeResults(uid, plan, activities)
 
     info "Result: ", res
 
     if not testRun:
-      await setResultValue(uid, row, resultCol, old[3], res)
+      await setResultValue(uid, row, resultCol, old[4], res)
 
   except MyError:
     warn getCurrentExceptionMsg()
@@ -662,11 +656,38 @@ proc process(testRun: bool, today: DateTime, uid, email: string,
 
 proc http*(local: bool) {.async.} =
   if local:
-    httpHost = "localhost"
-    redirectUri = "http://" & httpHost & ":" & $httpPort
-    # listenAddr = "0.0.0.0"
+    redirectUri = "http://localhost:" & $httpPort
+  else:
+    redirectUri = "https://" & defaultHttpHost
+
+  client = newAsyncHttpClient()
 
   info fmt"Browser to the {redirectUri} for registration"
   loadDB("reg")
   await server.serve(Port(httpPort), http_handler, address = listenAddr,
           domain = AF_INET6)
+
+proc process_all*(testRun: bool, daysOffset, stravaPagesMax: int,
+        pattern: string) {.async.} =
+  mergeRegistered()
+
+  var empty = true
+
+  client = newAsyncHttpClient()
+
+  let today = now() - initDuration(days = daysOffset)
+  for (uid, email) in get_uids():
+    empty = false
+    if pattern notin email:
+      continue
+    try:
+      await process(testRun, today, uid, email, stravaPagesMax)
+    except:
+      error "Error while processing ", email, ": ",
+              getCurrentExceptionMsg()
+
+  if empty:
+    warn "No records found. Try to run with --reg flag for registration"
+
+when isMainModule:
+  echo parseJson(readFile("2_1.json"))

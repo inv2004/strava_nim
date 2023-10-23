@@ -15,7 +15,7 @@ proc loadDB*(name: string) =
 
 # TODO: refactoring
 proc store*(profile: (string, string), accessToken: string) =
-  {.locks: [dbLock].}:
+  {.locks: [dbLock],gcsafe.}:
     let id = profile[0]
     let email = profile[1]
     let entry = db.queryOne equal("id", id)
@@ -30,7 +30,7 @@ proc store*(profile: (string, string), accessToken: string) =
 
 # TODO: refactoring
 proc upd_store*(id: string, key: string, value: string) {.gcsafe.} =
-  {.locks: [dbLock].}:
+  {.locks: [dbLock],gcsafe.}:
     let entry = db.queryOne equal("id", id)
     let db_id = entry["_id"].getStr
     db[db_id][key] = newJString(value)
@@ -38,13 +38,13 @@ proc upd_store*(id: string, key: string, value: string) {.gcsafe.} =
 
 # TODO: refactoring
 proc get_store*(id: string, key: string): string =
-  {.locks: [dbLock].}:
+  {.locks: [dbLock],gcsafe.}:
     let entry = db.queryOne equal("id", id)
     entry[key].getStr
 
 iterator get_uids*(): (string, string) =
   var res = newSeq[(string, string)]()
-  {.locks: [dbLock].}:
+  {.locks: [dbLock],gcsafe.}:
     for x in db:
       res.add (x["id"].getStr, x["email"].getStr)
   for x in res:

@@ -9,7 +9,7 @@ else:
   from os import `/`, splitFile
 
 const
-  doOptimize = true
+  doOptimize = false
 
 let
   # pcre
@@ -19,7 +19,8 @@ let
   pcreDownloadLink = "https://downloads.sourceforge.net/pcre/" & pcreArchiveFile
   pcreInstallDir = (thisDir() / "pcre/") & pcreVersion
   # http://www.linuxfromscratch.org/blfs/view/8.1/general/pcre.html
-  pcreConfigureCmd = ["./configure", "--prefix=" & pcreInstallDir, "--enable-pcre16", "--enable-pcre32", "--disable-shared"]
+  pcreConfigureCmd = ["./configure", "--prefix=" & pcreInstallDir,
+      "--enable-pcre16", "--enable-pcre32", "--disable-shared"]
   pcreIncludeDir = pcreInstallDir / "include"
   pcreLibDir = pcreInstallDir / "lib"
   pcreLibFile = pcreLibDir / "libpcre.a"
@@ -46,7 +47,9 @@ let
   #   - https://www.openwall.com/lists/musl/2016/02/04/5
   # -DOPENSSL_NO_SECURE_MEMORY is needed to make openssl compile using musl.
   #   - https://github.com/openssl/openssl/issues/7207#issuecomment-420814524
-  openSslConfigureCmd = ["./Configure", openSslSeedConfigOsCompiler, "no-shared", "no-zlib", "no-async", "-fPIC", "-DOPENSSL_NO_SECURE_MEMORY", "--prefix=" & openSslInstallDir]
+  openSslConfigureCmd = ["./Configure", openSslSeedConfigOsCompiler,
+      "no-shared", "no-zlib", "no-async", "-fPIC", "-DOPENSSL_NO_SECURE_MEMORY",
+      "--prefix=" & openSslInstallDir]
   openSslLibDir = openSslInstallDir / "lib"
   openSslLibFile = openSslLibDir / "libssl.a"
   openCryptoLibFile = openSslLibDir / "libcrypto.a"
@@ -55,7 +58,8 @@ let
 # https://github.com/kaushalmodi/nimy_lisp
 proc dollar[T](s: T): string =
   result = $s
-proc mapconcat[T](s: openArray[T]; sep = " "; op: proc(x: T): string = dollar): string =
+proc mapconcat[T](s: openArray[T]; sep = " "; op: proc(
+    x: T): string = dollar): string =
   ## Concatenate elements of ``s`` after applying ``op`` to each element.
   ## Separate each element using ``sep``.
   for i, x in s:
@@ -95,7 +99,7 @@ task installLibreSsl, "Installs LIBRESSL using musl-gcc":
       putEnv("C_INCLUDE_PATH", libreSslIncludeDir)
       exec(libreSslConfigureCmd.mapconcat())
       exec("make -j8 -C crypto") # build just the "crypto" component
-      exec("make -j8 -C ssl")    # build just the "ssl" component
+      exec("make -j8 -C ssl") # build just the "ssl" component
       exec("make -C crypto install")
       exec("make -C ssl install")
   else:
@@ -140,13 +144,13 @@ when defined(musl):
   # -d:pcre
   when defined(pcre):
     if not fileExists(pcreLibFile):
-      selfExec "installPcre"    # Install PCRE in current dir if pcreLibFile is not found
+      selfExec "installPcre" # Install PCRE in current dir if pcreLibFile is not found
     switch("passC", "-I" & pcreIncludeDir) # So that pcre.h is found when running the musl task
     switch("define", "usePcreHeader")
     switch("passL", pcreLibFile)
   # -d:libressl or -d:openssl
   when defined(libressl) or defined(openssl):
-    switch("define", "ssl")     # Pass -d:ssl to nim
+    switch("define", "ssl") # Pass -d:ssl to nim
     when defined(libressl):
       let
         sslLibFile = libreSslLibFile
@@ -176,9 +180,9 @@ when defined(musl):
 proc binOptimize(binFile: string) =
   ## Optimize size of the ``binFile`` binary.
   echo ""
-  if findExe("strip") != "":
-    echo "Running 'strip -s' .."
-    exec "strip -s " & binFile
+  # if findExe("strip") != "":
+  #   echo "Running 'strip -s' .."
+  #   exec "strip -s " & binFile
   if findExe("upx") != "":
     # https://github.com/upx/upx/releases/
     echo "Running 'upx --best' .."
@@ -199,7 +203,7 @@ task musl, "Builds an optimized static binary using musl":
   # param 0 will always be "nim"
   # param 1 will always be "musl"
   for i in 2 .. numParams:
-    if paramStr(i)[0] == '-':    # -d:foo or --define:foo
+    if paramStr(i)[0] == '-': # -d:foo or --define:foo
       switches.add(paramStr(i))
     else:
       # Non-switch parameters are assumed to be Nim file names.
@@ -217,9 +221,10 @@ task musl, "Builds an optimized static binary using musl":
     let
       extraSwitches = switches.mapconcat()
       (dirName, baseName, _) = splitFile(f)
-      binFile = dirName / baseName  # Save the binary in the same dir as the nim file
+      binFile = dirName / baseName # Save the binary in the same dir as the nim file
       nimArgsArray = when doOptimize:
-                       ["c", "-d:musl", "-d:release", "--opt:size", extraSwitches, f]
+                       ["c", "-d:musl", "-d:release", "--opt:size",
+                           extraSwitches, f]
                      else:
                        ["c", "-d:musl", extraSwitches, f]
       nimArgs = nimArgsArray.mapconcat()
