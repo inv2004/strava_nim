@@ -1,3 +1,5 @@
+### Replaced with https://github.com/inv2004/intervals_nim
+
 ### Automatic training diary from strava
 
 The draft version is able to:
